@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autotrading/contracts/schemas/opa.policy.input.v1.json",
+  "title": "opa.policy.input.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "trace_id",
+    "signal_id",
+    "agent_id",
+    "instrument_id",
+    "side",
+    "qty",
+    "now_utc",
+    "trading_mode"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "opa.policy.input.v1"
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_type": {
+      "type": "string"
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "side": {
+      "type": "string",
+      "enum": ["BUY", "SELL"]
+    },
+    "qty": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "now_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "daily_realized_pnl": {
+      "type": "number"
+    },
+    "daily_unrealized_pnl": {
+      "type": "number"
+    },
+    "trades_today": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "current_position": {
+      "type": "number"
+    },
+    "kill_switch": {
+      "type": "boolean"
+    },
+    "trading_mode": {
+      "type": "string",
+      "enum": ["NORMAL", "FROZEN", "KILL_SWITCH"]
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autotrading/contracts/schemas/ingress.events.normalized.v1.json",
+  "title": "ingress.events.normalized.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "event_version",
+    "occurred_at",
+    "trace_id",
+    "ingress_event_id",
+    "idempotency_key",
+    "source_protocol",
+    "source_type",
+    "event_intent",
+    "principal",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "event_type": {
+      "type": "string",
+      "const": "ingress.events.normalized"
+    },
+    "event_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "trace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "ingress_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_protocol": {
+      "type": "string",
+      "enum": ["WEBHOOK", "API", "GRPC", "WEBSOCKET"]
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["EXTERNAL_SYSTEM", "TRADER_UI"]
+    },
+    "event_intent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "integration_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_id", "principal_type", "auth_method"],
+      "properties": {
+        "principal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "principal_type": {
+          "type": "string",
+          "enum": ["USER", "SERVICE", "INTEGRATION"]
+        },
+        "auth_method": {
+          "type": "string",
+          "enum": ["JWT", "HMAC", "MTLS_TOKEN"]
+        }
+      }
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "source_type": { "const": "EXTERNAL_SYSTEM" } }
+      },
+      "then": {
+        "required": ["integration_id", "source_event_id"]
+      }
+    }
+  ]
+}

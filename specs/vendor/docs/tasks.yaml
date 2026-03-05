@@ -1,0 +1,120 @@
+version: 1
+tasks:
+  - task_id: ATP-A01
+    title: Create docs/tasks.yaml schema and migrate implementation tasks
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: tools/plan-sync
+    status: DONE
+    risk_tier: P1
+    acceptance_criteria:
+      - docs/tasks.schema.json exists and validates mandatory fields
+      - docs/tasks.yaml includes ATP-A01 through ATP-A08
+    evidence_url: https://example.com/evidence/ATP-A01
+    release_tag: v0.1.0
+    labels: [automation, plan-sync]
+
+  - task_id: ATP-A02
+    title: Build Java CLI validate command
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: tools/plan-sync
+    status: DONE
+    risk_tier: P1
+    acceptance_criteria:
+      - validate command rejects duplicate task IDs
+      - validate command rejects missing mandatory fields
+      - validate command enforces evidence on DONE status
+    evidence_url: https://example.com/evidence/ATP-A02
+    release_tag: v0.1.0
+    labels: [automation, validation]
+
+  - task_id: ATP-A03
+    title: Build Java CLI sync-github command
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: tools/plan-sync
+    status: READY
+    risk_tier: P1
+    acceptance_criteria:
+      - command upserts GitHub issues by task_id
+      - command applies managed labels for team/service/status/risk
+      - command marks removed tasks as deprecated issues
+    evidence_url: ""
+    release_tag: v0.1.0
+    labels: [automation, github]
+
+  - task_id: ATP-A04
+    title: Add PR validation workflow
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: .github/workflows
+    status: READY
+    risk_tier: P2
+    acceptance_criteria:
+      - workflow triggers on pull requests touching plan docs
+      - workflow runs validate against current and baseline tasks
+      - workflow fails for invalid status transitions
+    evidence_url: ""
+    release_tag: v0.1.0
+    labels: [github-actions, ci]
+
+  - task_id: ATP-A05
+    title: Add merge sync workflow
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: .github/workflows
+    status: READY
+    risk_tier: P2
+    acceptance_criteria:
+      - workflow triggers on push to main
+      - workflow runs sync-github command successfully
+      - workflow supports optional project field config
+    evidence_url: ""
+    release_tag: v0.1.0
+    labels: [github-actions, automation]
+
+  - task_id: ATP-A06
+    title: Build Java CLI export-excel command
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: tools/plan-sync
+    status: READY
+    risk_tier: P2
+    acceptance_criteria:
+      - command generates xlsx report from GitHub issues
+      - workbook includes all required sheets
+      - output path is configurable
+    evidence_url: ""
+    release_tag: v0.1.0
+    labels: [excel, reporting]
+
+  - task_id: ATP-A07
+    title: Add scheduled Excel export workflow
+    epic: EPIC-AUTOMATION
+    owner_team: Platform-DevEx
+    service: .github/workflows
+    status: BACKLOG
+    risk_tier: P3
+    acceptance_criteria:
+      - workflow supports daily schedule and manual dispatch
+      - report is uploaded as artifact
+      - optional report commit mode is supported
+    evidence_url: ""
+    release_tag: v0.1.0
+    labels: [github-actions, excel]
+
+  - task_id: ATP-A08
+    title: Write runbook for sync failure and recovery
+    epic: EPIC-AUTOMATION
+    owner_team: QA-Release
+    service: docs/runbooks
+    status: BACKLOG
+    risk_tier: P2
+    acceptance_criteria:
+      - runbook covers retry behavior and idempotency checks
+      - runbook includes project field sync failure fallback
+      - runbook includes incident escalation path
+    evidence_url: ""
+    release_tag: v0.1.0
+    labels: [runbook, operations]

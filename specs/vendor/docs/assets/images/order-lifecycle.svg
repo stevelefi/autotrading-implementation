@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="500" viewBox="0 0 1400 500">
+  <defs>
+    <style>
+      .title { font: bold 20px Arial, sans-serif; fill: #111827; }
+      .node { fill: #f8fafc; stroke: #334155; stroke-width: 2; rx: 8; ry: 8; }
+      .critical { fill: #fff1f2; stroke: #be123c; stroke-width: 2; rx: 8; ry: 8; }
+      .txt { font: 13px Arial, sans-serif; fill: #111827; }
+      .arrow { stroke: #475569; stroke-width: 2; marker-end: url(#a); }
+    </style>
+    <marker id="a" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <text x="30" y="35" class="title">Order Lifecycle and Timeout Safety</text>
+
+  <rect class="node" x="40" y="90" width="150" height="60"/>
+  <text x="85" y="125" class="txt">CREATED</text>
+
+  <rect class="node" x="240" y="90" width="170" height="60"/>
+  <text x="275" y="125" class="txt">RISK_APPROVED</text>
+
+  <rect class="node" x="460" y="90" width="170" height="60"/>
+  <text x="500" y="125" class="txt">SUBMIT_PENDING</text>
+
+  <rect class="node" x="680" y="90" width="180" height="60"/>
+  <text x="710" y="125" class="txt">SUBMITTED_ACKED</text>
+
+  <rect class="node" x="910" y="90" width="180" height="60"/>
+  <text x="950" y="125" class="txt">PARTIALLY_FILLED</text>
+
+  <rect class="node" x="1140" y="90" width="150" height="60"/>
+  <text x="1185" y="125" class="txt">FILLED</text>
+
+  <rect class="critical" x="700" y="260" width="230" height="75"/>
+  <text x="730" y="295" class="txt">UNKNOWN_PENDING_RECON</text>
+  <text x="745" y="315" class="txt">(trigger FROZEN mode)</text>
+
+  <line class="arrow" x1="190" y1="120" x2="240" y2="120"/>
+  <line class="arrow" x1="410" y1="120" x2="460" y2="120"/>
+  <line class="arrow" x1="630" y1="120" x2="680" y2="120"/>
+  <line class="arrow" x1="860" y1="120" x2="910" y2="120"/>
+  <line class="arrow" x1="1090" y1="120" x2="1140" y2="120"/>
+
+  <line class="arrow" x1="545" y1="150" x2="780" y2="260"/>
+  <text x="560" y="190" class="txt">No broker status in 60s</text>
+
+  <line class="arrow" x1="815" y1="335" x2="815" y2="430"/>
+  <rect class="node" x="690" y="430" width="250" height="50"/>
+  <text x="730" y="460" class="txt">Reconciliation + Operator Ack</text>
+</svg>
