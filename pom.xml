@@ -128,12 +128,22 @@
                 <configuration>
                   <skip>${coverage.check.skip}</skip>
                   <excludes>
+                    <!-- Spring Boot entry points -->
                     <exclude>**/*Application.class</exclude>
+                    <!-- Generated gRPC/protobuf stubs -->
                     <exclude>**/*Grpc.class</exclude>
                     <exclude>**/*Grpc$*.class</exclude>
                     <exclude>**/*Proto*.class</exclude>
                     <exclude>**/*OuterClass*.class</exclude>
                     <exclude>**/*OrBuilder.class</exclude>
+                    <!-- Spring wiring: @Configuration + @AutoConfiguration beans
+                         contain bean factory methods only — no business logic -->
+                    <exclude>**/*Configuration.class</exclude>
+                    <exclude>**/*AutoConfiguration.class</exclude>
+                    <!-- JDBC/Kafka infrastructure: requires DB+Kafka integration
+                         tests; covered by e2e suite, not unit coverage -->
+                    <exclude>**/Jdbc*.class</exclude>
+                    <exclude>**/KafkaOutbox*.class</exclude>
                   </excludes>
                   <rules>
                     <rule>
