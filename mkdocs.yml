@@ -1,0 +1,67 @@
+site_name: Autotrading Implementation
+site_description: Operational documentation for the autotrading backend — data flow, observability, reliability, and implementation guide.
+site_url: https://stevelefi.github.io/autotrading-implementation/
+repo_url: https://github.com/stevelefi/autotrading-implementation
+repo_name: stevelefi/autotrading-implementation
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Data Flow: DATA_FLOW.md
+  - Implementation Guide: IMPLEMENTATION_INSTRUCTIONS.md
+  - Observability: OBSERVABILITY.md
+  - Runbooks:
+    - Reliability Drills: runbooks/reliability-drills.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/stevelefi/autotrading-implementation
+  # Link back to the spec/design site
+  links:
+    - name: Spec & Design
+      url: https://stevelefi.github.io/autotrading/

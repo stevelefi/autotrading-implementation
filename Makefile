@@ -3,9 +3,8 @@ STACK := python3 scripts/stack.py
 
 .PHONY: up up-infra up-app down down-infra restart restart-app build status logs validate ci-local \
         test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec \
-        helm-lint helm-template pre-commit
-
-# ── Docker orchestration (delegates to scripts/stack.py) ─────────────────────
+	helm-lint helm-template pre-commit \
+	docs-serve docs-build docs-install
 
 build:
 	$(STACK) build
@@ -69,4 +68,16 @@ helm-template:
 
 pre-commit: test-unit test-coverage-core verify-spec helm-lint helm-template
 	@echo "All local checks passed."
+
+# ── Documentation (MkDocs) ───────────────────────────────────────────────────
+
+docs-install:
+	pip install -r requirements-docs.txt
+
+docs-serve:
+	mkdocs serve
+
+docs-build:
+	mkdocs build --strict --site-dir _site
+	@echo "Site built → _site/"
 

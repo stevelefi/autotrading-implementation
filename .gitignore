@@ -50,6 +50,9 @@ Thumbs.db
 # Pulled spec artifacts (generated via tools/spec_sync.py)
 specs/vendor/
 
+# MkDocs build output
+_site/
+
 # Generated local smoke evidence artifacts
 reports/blitz/e2e-results/smoke-local-*.md
 reports/blitz/drill-logs/smoke-local-*.json

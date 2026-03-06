@@ -730,8 +730,8 @@ For distributed **trace** storage (linking spans across services), add Grafana T
 |---|---|
 | Data flow and service interactions | [docs/DATA_FLOW.md](DATA_FLOW.md) |
 | Implementation workflow, spec freeze | [docs/IMPLEMENTATION_INSTRUCTIONS.md](IMPLEMENTATION_INSTRUCTIONS.md) |
-| Reliability drill logs | [reports/blitz/drill-logs/](../reports/blitz/drill-logs/) |
-| Prometheus alerts config | [infra/observability/prometheus/alerts.yml](../infra/observability/prometheus/alerts.yml) |
-| Grafana reliability dashboard | [infra/observability/grafana/dashboards/reliability.json](../infra/observability/grafana/dashboards/reliability.json) |
-| OTel Collector config | [infra/observability/otel-collector/config.yaml](../infra/observability/otel-collector/config.yaml) |
-| Promtail config | [infra/observability/promtail/promtail-config.yaml](../infra/observability/promtail/promtail-config.yaml) |
+| Reliability drill logs | [reports/blitz/drill-logs/](https://github.com/stevelefi/autotrading-implementation/tree/main/reports/blitz/drill-logs) |
+| Prometheus alerts config | [infra/observability/prometheus/alerts.yml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/prometheus/alerts.yml) |
+| Grafana reliability dashboard | [infra/observability/grafana/dashboards/reliability.json](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/grafana/dashboards/reliability.json) |
+| OTel Collector config | [infra/observability/otel-collector/config.yaml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/otel-collector/config.yaml) |
+| Promtail config | [infra/observability/promtail/promtail-config.yaml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/promtail/promtail-config.yaml) |
