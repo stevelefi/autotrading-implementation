@@ -3,14 +3,21 @@ name: ci
 on:
   pull_request:
     branches: ["main"]
-  push:
-    branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "reports/**"
+
+# Cancel in-flight runs for the same branch/PR when new commits arrive
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  build-test:
+  build-test-coverage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,23 +32,11 @@ jobs:
       - name: Unit and integration tests
         run: mvn -B test
 
+      - name: Core module coverage gate (line >= 50%)
+        run: make test-coverage-core
+
       - name: Migration apply check
         run: mvn -B -pl tests/e2e -am -Dtest=FlywayMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Compose smoke (synthetic ingress path)
         run: mvn -B -pl tests/e2e -am -Dtest=VerticalSliceGrpcFlowTest -Dsurefire.failIfNoSpecifiedTests=false test
-
-  coverage-core:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
-
-      - name: Core module coverage gate (line >= 50%)
-        run: make test-coverage-core

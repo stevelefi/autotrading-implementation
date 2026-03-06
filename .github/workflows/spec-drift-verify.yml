@@ -3,8 +3,11 @@ name: spec-drift-verify
 on:
   pull_request:
     branches: ["main"]
-  push:
-    branches: ["main"]
+    paths:
+      - "SPEC_VERSION.json"
+      - "tools/spec_sync.py"
+      - "specs/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
