@@ -1,17 +1,20 @@
 package com.autotrading.services.order.runtime;
 
+import java.time.Clock;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.core.OrderSafetyEngine;
 import com.autotrading.services.order.grpc.OrderCommandGrpcService;
-import io.micrometer.core.instrument.MeterRegistry;
+
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import java.time.Clock;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
 public class OrderRuntimeConfiguration {
@@ -41,6 +44,14 @@ public class OrderRuntimeConfiguration {
   @Bean
   OrderSafetyEngine orderSafetyEngine(ReliabilityMetrics reliabilityMetrics, Clock clock) {
     return new OrderSafetyEngine(reliabilityMetrics, clock);
+  }
+
+  @Bean
+  OrderTimeoutWatchdogLifecycle orderTimeoutWatchdogLifecycle(
+      OrderSafetyEngine orderSafetyEngine,
+      Clock clock,
+      @Value("${order.timeout.watchdog.interval.ms:5000}") long intervalMs) {
+    return new OrderTimeoutWatchdogLifecycle(orderSafetyEngine, clock, intervalMs);
   }
 
   @Bean

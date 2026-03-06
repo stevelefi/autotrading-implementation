@@ -25,14 +25,9 @@ scrape_configs:
       - source_labels: ["__meta_docker_container_label_com_docker_compose_project"]
         target_label: compose_project
     pipeline_stages:
-      - json:
-          expressions:
-            trace_id: trace_id
-            request_id: request_id
-            idempotency_key: idempotency_key
-            principal_id: principal_id
-            level: level
+      - regex:
+          expression: 'level=\s*(?P<level>\S+).*trace_id=(?P<trace_id>\S+).*request_id=(?P<request_id>\S+)'
       - labels:
+          level:
           trace_id:
           request_id:
-          level:

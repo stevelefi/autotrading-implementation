@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: up down logs test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec
+.PHONY: up down logs test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template
 
 up:
 	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml up -d --remove-orphans
@@ -29,3 +29,9 @@ rollback-local:
 
 verify-spec:
 	python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
+
+helm-lint:
+	helm lint infra/helm/charts/trading-service
+
+helm-template:
+	helm template trading-service infra/helm/charts/trading-service -f infra/helm/charts/trading-service/values.yaml

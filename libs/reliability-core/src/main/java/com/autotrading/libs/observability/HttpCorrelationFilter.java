@@ -18,10 +18,10 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <p>Headers inspected (case-insensitive per HTTP spec):
  * <ul>
- *   <li>{@code X-Trace-Id}        → MDC key {@code traceId}</li>
- *   <li>{@code X-Request-Id}      → MDC key {@code requestId}</li>
- *   <li>{@code X-Idempotency-Key} → MDC key {@code idempotencyKey}</li>
- *   <li>{@code X-Principal-Id}    → MDC key {@code principalId}</li>
+ *   <li>{@code X-Trace-Id}        → MDC key {@code trace_id}</li>
+ *   <li>{@code X-Request-Id}      → MDC key {@code request_id}</li>
+ *   <li>{@code X-Idempotency-Key} → MDC key {@code idempotency_key}</li>
+ *   <li>{@code X-Principal-Id}    → MDC key {@code principal_id}</li>
  * </ul>
  *
  * <p>If a header is absent or blank a random UUID is generated so that
@@ -31,10 +31,10 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 public class HttpCorrelationFilter extends OncePerRequestFilter {
 
-  static final String MDC_TRACE_ID        = "traceId";
-  static final String MDC_REQUEST_ID      = "requestId";
-  static final String MDC_IDEMPOTENCY_KEY = "idempotencyKey";
-  static final String MDC_PRINCIPAL_ID    = "principalId";
+  static final String MDC_TRACE_ID        = "trace_id";
+  static final String MDC_REQUEST_ID      = "request_id";
+  static final String MDC_IDEMPOTENCY_KEY = "idempotency_key";
+  static final String MDC_PRINCIPAL_ID    = "principal_id";
 
   @Override
   protected void doFilterInternal(HttpServletRequest request,
