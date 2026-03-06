@@ -56,3 +56,16 @@ make down
 
 ## Contributor Instructions
 - Full implementation and PR-quality instructions: [docs/IMPLEMENTATION_INSTRUCTIONS.md](docs/IMPLEMENTATION_INSTRUCTIONS.md)
+    python tools/spec_sync.py sync --repo-url https://github.com/stevelefi/autotrading.git --ref spec-v1.0.1-m0m1 --dest specs/vendor --version-file SPEC_VERSION.json
+    python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
+
+## Slack Agent Status
+- Caller workflow: `.github/workflows/agent-status.yml`.
+- Uses reusable workflow from `stevelefi/autotrading-devops`.
+
+Required GitHub secrets:
+- `SLACK_BOT_TOKEN` (Bot token, `xoxb-...`)
+- `SLACK_CHANNEL_ID_STATUS` (target channel ID)
+
+Optional GitHub secret:
+- `SLACK_ONCALL_GROUP_ID` (used for `BLOCKED` mentions)

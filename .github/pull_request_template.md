@@ -10,6 +10,7 @@
   - [ ] `python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`
 
 ## Acceptance Criteria
+- [ ] This change matches the repo charter boundary
 - [ ] All issue acceptance criteria addressed
 - [ ] Evidence attached (logs/tests/screenshots/links)
 
