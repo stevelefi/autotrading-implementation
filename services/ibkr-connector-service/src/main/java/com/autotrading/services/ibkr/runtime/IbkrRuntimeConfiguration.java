@@ -13,6 +13,7 @@ import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.autotrading.services.ibkr.grpc.BrokerCommandGrpcService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,9 +34,10 @@ public class IbkrRuntimeConfiguration {
   BrokerConnectorEngine brokerConnectorEngine(
       IdempotencyService idempotencyService,
       BrokerOrderRepository brokerOrderRepository,
+      ExecutionRepository executionRepository,
       OutboxRepository outboxRepository,
       ObjectMapper objectMapper) {
-    return new BrokerConnectorEngine(idempotencyService, brokerOrderRepository, outboxRepository, objectMapper);
+    return new BrokerConnectorEngine(idempotencyService, brokerOrderRepository, executionRepository, outboxRepository, objectMapper);
   }
 
   @Bean

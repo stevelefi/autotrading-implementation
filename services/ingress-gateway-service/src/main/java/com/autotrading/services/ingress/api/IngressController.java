@@ -1,6 +1,7 @@
 package com.autotrading.services.ingress.api;
 
 import com.autotrading.services.ingress.core.IngressService;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,7 @@ public class IngressController {
       @RequestHeader("Authorization") String authorization,
       @RequestHeader("X-Request-Id") String requestId,
       @RequestBody IngressSubmitRequest request) {
+    if (request.agent_id() != null) MDC.put("agent_id", request.agent_id());
     IngressAcceptedResponse response = ingressService.accept(request, requestId, authorization);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
   }

@@ -40,6 +40,21 @@ public class MonitoringController {
     this.ingressForwarder = ingressForwarder;
     this.systemControlRepository = systemControlRepository;
     this.alertEventConsumer = alertEventConsumer;
+
+    // Restore persisted system controls on startup
+    try {
+      boolean killSwitch = systemControlRepository.findById("KILL_SWITCH")
+          .map(e -> "ON".equals(e.getControlValue()))
+          .orElse(false);
+      MonitoringTradingMode mode = systemControlRepository.findById("TRADING_MODE")
+          .map(e -> MonitoringTradingMode.valueOf(e.getControlValue()))
+          .orElse(MonitoringTradingMode.NORMAL);
+      if (killSwitch) mode = MonitoringTradingMode.FROZEN;
+      controls.set(new SystemControlState(killSwitch, mode, Instant.now(), "system", "db-restore"));
+      log.info("monitoring restored controls from DB killSwitch={} tradingMode={}", killSwitch, mode);
+    } catch (Exception e) {
+      log.warn("monitoring failed to restore controls from DB, using defaults: {}", e.getMessage());
+    }
   }
 
   @PostMapping("/trade-events/manual")
@@ -147,16 +162,12 @@ public class MonitoringController {
   }
 
   private void persistControl(String key, String value, String actorId, String traceId, Instant now) {
-    try {
-      SystemControlEntity entity = systemControlRepository.findById(key)
-          .orElseGet(() -> new SystemControlEntity(key, value, actorId, traceId, now));
-      entity.setControlValue(value);
-      entity.setActorId(actorId);
-      entity.setTraceId(traceId);
-      entity.setUpdatedAt(now);
-      systemControlRepository.save(entity);
-    } catch (Exception e) {
-      log.warn("monitoring failed to persist system control key={} cause={}", key, e.getMessage(), e);
-    }
+    SystemControlEntity entity = systemControlRepository.findById(key)
+        .orElseGet(() -> new SystemControlEntity(key, value, actorId, traceId, now));
+    entity.setControlValue(value);
+    entity.setActorId(actorId);
+    entity.setTraceId(traceId);
+    entity.setUpdatedAt(now);
+    systemControlRepository.save(entity);
   }
 }

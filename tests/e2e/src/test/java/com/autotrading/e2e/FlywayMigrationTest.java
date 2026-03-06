@@ -12,7 +12,9 @@ class FlywayMigrationTest {
 
   @Test
   void appliesBaselineMigrations() throws Exception {
-    String url = "jdbc:h2:mem:autotrading;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS TIMESTAMPTZ AS TIMESTAMP WITH TIME ZONE\\;";
+    String url = "jdbc:h2:mem:autotrading;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;" +
+        "INIT=CREATE DOMAIN IF NOT EXISTS TIMESTAMPTZ AS TIMESTAMP WITH TIME ZONE\\;" +
+        "CREATE DOMAIN IF NOT EXISTS JSONB AS CLOB\\;";
 
     Flyway flyway = Flyway.configure()
         .dataSource(url, "sa", "")

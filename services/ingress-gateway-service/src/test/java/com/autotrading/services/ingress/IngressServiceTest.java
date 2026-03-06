@@ -16,6 +16,8 @@ import com.autotrading.services.ingress.core.IngressService;
 import com.autotrading.services.ingress.db.IngressRawEventEntity;
 import com.autotrading.services.ingress.db.IngressRawEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -44,7 +46,8 @@ class IngressServiceTest {
         new InMemoryIdempotencyService(),
         mockOutbox,
         mockRawRepo,
-        new ObjectMapper());
+        new ObjectMapper().registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
   }
 
   @Test

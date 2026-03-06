@@ -7,6 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -35,14 +36,19 @@ public class AlertEventConsumer {
       String source = root.path("source").asText("unknown");
       Instant receivedAt = Instant.now();
 
+      MDC.put("agent_id", source);
+      MDC.put("request_id", String.valueOf(record.offset()));
+
       AlertEvent alert = new AlertEvent(severity, message, source, receivedAt);
       recentAlerts.add(alert);
-      if (recentAlerts.size() > MAX_ALERTS) {
+      while (recentAlerts.size() > MAX_ALERTS) {
         recentAlerts.remove(0);
       }
       log.info("monitoring received alert severity={} source={} message={}", severity, source, message);
     } catch (Exception e) {
-      log.warn("monitoring failed to parse alert offset={} cause={}", record.offset(), e.getMessage());
+      log.warn("monitoring failed to parse alert offset={} cause={}", record.offset(), e.getMessage(), e);
+    } finally {
+      MDC.clear();
     }
   }
 
@@ -53,9 +59,18 @@ public class AlertEventConsumer {
       String severity = root.path("severity").asText("INFO");
       String eventType = root.path("eventType").asText("risk.event");
       String agentId = root.path("agentId").asText("unknown");
+
+      MDC.put("agent_id", agentId);
+      MDC.put("request_id", String.valueOf(record.offset()));
+
       recentAlerts.add(new AlertEvent(severity, "risk-event:" + eventType, agentId, Instant.now()));
+      while (recentAlerts.size() > MAX_ALERTS) {
+        recentAlerts.remove(0);
+      }
     } catch (Exception e) {
-      log.warn("monitoring failed to parse risk event offset={} cause={}", record.offset(), e.getMessage());
+      log.warn("monitoring failed to parse risk event offset={} cause={}", record.offset(), e.getMessage(), e);
+    } finally {
+      MDC.clear();
     }
   }
 

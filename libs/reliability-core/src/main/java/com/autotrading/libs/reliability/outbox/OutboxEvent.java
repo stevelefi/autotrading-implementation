@@ -1,6 +1,7 @@
 package com.autotrading.libs.reliability.outbox;
 
 import java.time.Instant;
+import java.util.Objects;
 
 public record OutboxEvent(
     String eventId,
@@ -13,6 +14,15 @@ public record OutboxEvent(
     Instant createdAtUtc,
     Instant updatedAtUtc
 ) {
+  public OutboxEvent {
+    Objects.requireNonNull(eventId, "eventId");
+    Objects.requireNonNull(topic, "topic");
+    Objects.requireNonNull(payload, "payload");
+    Objects.requireNonNull(status, "status");
+    Objects.requireNonNull(createdAtUtc, "createdAtUtc");
+    Objects.requireNonNull(updatedAtUtc, "updatedAtUtc");
+  }
+
   public OutboxEvent markDispatched(Instant nowUtc) {
     return new OutboxEvent(eventId, topic, partitionKey, payload, OutboxStatus.DISPATCHED, attempts + 1, null, createdAtUtc, nowUtc);
   }

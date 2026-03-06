@@ -44,6 +44,7 @@ public class JdbcOutboxRepository implements OutboxRepository {
   }
 
   @Override
+  @Transactional
   public List<OutboxEvent> pollNew(int batchSize) {
     return jdbc.query(
         """
@@ -52,6 +53,7 @@ public class JdbcOutboxRepository implements OutboxRepository {
           FROM outbox_events
          WHERE status = 'NEW'
          ORDER BY created_at_utc
+           FOR UPDATE SKIP LOCKED
          LIMIT ?
         """,
         this::mapRow,

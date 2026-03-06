@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,8 @@ public class FillsConsumer {
     } catch (Exception e) {
       log.error("performance-service failed to process fill offset={} cause={}", record.offset(), e.getMessage(), e);
       throw new RuntimeException("performance fills consumer failure", e);
+    } finally {
+      MDC.clear();
     }
   }
 
@@ -64,6 +67,11 @@ public class FillsConsumer {
     String instrumentId = root.path("instrumentId").asText("eq_tqqq");
     int fillQty = root.path("fillQty").asInt(0);
     BigDecimal fillPrice = new BigDecimal(root.path("fillPrice").asText("0"));
+
+    // Set MDC for structured logging
+    MDC.put("request_id", execId);
+    if (agentId != null) MDC.put("agent_id", agentId);
+    MDC.put("instrument_id", instrumentId);
 
     final String finalAgentId = agentId != null ? agentId : "anonymous";
     final BigDecimal finalFillPrice = fillPrice;

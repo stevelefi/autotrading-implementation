@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,7 +63,9 @@ public class EventProcessorConsumer {
     } catch (Exception e) {
       log.error("failed to process ingress event offset={} key={}: {}",
           record.offset(), record.key(), e.getMessage(), e);
-      // do not re-throw — let Kafka commit the offset (dead-letter in future)
+      throw new RuntimeException("ingress event processing failed offset=" + record.offset(), e);
+    } finally {
+      MDC.clear();
     }
   }
 
@@ -73,6 +76,12 @@ public class EventProcessorConsumer {
     String traceId = root.at("/context/traceId").asText("");
     String idempotencyKey = root.at("/context/idempotencyKey").asText("");
     String agentId = root.path("agentId").asText(null);
+
+    // Set MDC for structured logging
+    MDC.put("trace_id", traceId);
+    MDC.put("idempotency_key", idempotencyKey);
+    MDC.put("request_id", ingressEventId);
+    if (agentId != null) MDC.put("agent_id", agentId);
     Instant occurredAt;
     try {
       occurredAt = Instant.parse(root.path("occurredAt").asText());

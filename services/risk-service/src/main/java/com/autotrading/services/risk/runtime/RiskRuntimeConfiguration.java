@@ -12,6 +12,7 @@ import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,10 +54,11 @@ public class RiskRuntimeConfiguration {
       OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub,
       SimplePolicyEngine policyEngine,
       RiskDecisionRepository riskDecisionRepository,
+      PolicyDecisionLogRepository policyDecisionLogRepository,
       OutboxRepository outboxRepository,
       ObjectMapper objectMapper) {
     return new RiskDecisionGrpcService(orderStub, policyEngine, riskDecisionRepository,
-        outboxRepository, objectMapper);
+        policyDecisionLogRepository, outboxRepository, objectMapper);
   }
 
   @Bean

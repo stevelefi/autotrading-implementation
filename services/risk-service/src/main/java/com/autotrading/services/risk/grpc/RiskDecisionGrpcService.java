@@ -12,6 +12,7 @@ import com.autotrading.services.risk.core.PolicyAuditEvent;
 import com.autotrading.services.risk.core.PolicyEvaluationResult;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
 import com.autotrading.services.risk.db.PolicyDecisionLogEntity;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionEntity;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.transaction.annotation.Transactional;
 
 public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisionServiceImplBase {
@@ -33,6 +35,7 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
   private final OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub;
   private final SimplePolicyEngine policyEngine;
   private final RiskDecisionRepository riskDecisionRepository;
+  private final PolicyDecisionLogRepository policyDecisionLogRepository;
   private final OutboxRepository outboxRepository;
   private final ObjectMapper objectMapper;
   private final List<PolicyAuditEvent> auditEvents = new CopyOnWriteArrayList<>();
@@ -41,11 +44,13 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
       OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub,
       SimplePolicyEngine policyEngine,
       RiskDecisionRepository riskDecisionRepository,
+      PolicyDecisionLogRepository policyDecisionLogRepository,
       OutboxRepository outboxRepository,
       ObjectMapper objectMapper) {
     this.orderStub = orderStub;
     this.policyEngine = policyEngine;
     this.riskDecisionRepository = riskDecisionRepository;
+    this.policyDecisionLogRepository = policyDecisionLogRepository;
     this.outboxRepository = outboxRepository;
     this.objectMapper = objectMapper;
   }
@@ -54,6 +59,11 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
   @Transactional
   public void evaluateSignal(EvaluateSignalRequest request, StreamObserver<EvaluateSignalResponse> responseObserver) {
     try {
+      // Set domain MDC keys for structured logging
+      MDC.put("agent_id", request.getAgentId());
+      MDC.put("signal_id", request.getSignalId());
+      MDC.put("instrument_id", request.getInstrumentId());
+
       validateLineage(request);
 
       Instant started = Instant.now();
@@ -87,40 +97,37 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
       String riskDecisionId = "rdec-" + UUID.randomUUID();
       String traceId = request.getRequestContext().getTraceId();
 
-      // Persist risk decision
-      try {
-        String denyReasonsJson = objectMapper.writeValueAsString(result.denyReasons());
-        String matchedRuleIdsJson = objectMapper.writeValueAsString(result.matchedRuleIds());
-        riskDecisionRepository.save(new RiskDecisionEntity(
-            riskDecisionId, request.getSignalId(), traceId,
-            result.decision().name(), denyReasonsJson, result.policyVersion(),
-            result.policyRuleSet(), matchedRuleIdsJson, result.failureMode().name(), now));
+      // Persist risk decision — let exceptions propagate so @Transactional rolls back
+      String denyReasonsJson = objectMapper.writeValueAsString(result.denyReasons());
+      String matchedRuleIdsJson = objectMapper.writeValueAsString(result.matchedRuleIds());
+      riskDecisionRepository.save(new RiskDecisionEntity(
+          riskDecisionId, request.getSignalId(), traceId,
+          result.decision().name(), denyReasonsJson, result.policyVersion(),
+          result.policyRuleSet(), matchedRuleIdsJson, result.failureMode().name(), now));
 
-        // Persist policy decision log
-        PolicyDecisionLogEntity logEntity = new PolicyDecisionLogEntity(
-            "pdl-" + UUID.randomUUID(), riskDecisionId, traceId,
-            request.getAgentId(), request.getSignalId(), result.decision().name(),
-            result.policyVersion(), result.policyRuleSet(), latencyMs, now);
-        // Use outbox to avoid requiring a separate repo bean; append via save workaround —
-        // save the log to outbox as policy.evaluations.audit.v1
-        String auditPayload = objectMapper.writeValueAsString(java.util.Map.of(
-            "riskDecisionId", riskDecisionId,
-            "signalId", request.getSignalId(),
-            "traceId", traceId,
-            "agentId", request.getAgentId(),
-            "decision", result.decision(),
-            "policyVersion", result.policyVersion(),
-            "latencyMs", latencyMs));
-        outboxRepository.append(new OutboxEvent(
-            "audit-" + UUID.randomUUID(),
-            "policy.evaluations.audit.v1",
-            request.getAgentId(),
-            auditPayload,
-            OutboxStatus.NEW,
-            0, null, now, now));
-      } catch (Exception dbEx) {
-        log.warn("risk-service failed to persist risk decision traceId={} cause={}", traceId, dbEx.getMessage(), dbEx);
-      }
+      // Persist policy decision log
+      PolicyDecisionLogEntity logEntity = new PolicyDecisionLogEntity(
+          "pdl-" + UUID.randomUUID(), riskDecisionId, traceId,
+          request.getAgentId(), request.getSignalId(), result.decision().name(),
+          result.policyVersion(), result.policyRuleSet(), latencyMs, now);
+      policyDecisionLogRepository.save(logEntity);
+
+      // Publish audit event to outbox for downstream consumers
+      String auditPayload = objectMapper.writeValueAsString(java.util.Map.of(
+          "riskDecisionId", riskDecisionId,
+          "signalId", request.getSignalId(),
+          "traceId", traceId,
+          "agentId", request.getAgentId(),
+          "decision", result.decision(),
+          "policyVersion", result.policyVersion(),
+          "latencyMs", latencyMs));
+      outboxRepository.append(new OutboxEvent(
+          "audit-" + UUID.randomUUID(),
+          "policy.evaluations.audit.v1",
+          request.getAgentId(),
+          auditPayload,
+          OutboxStatus.NEW,
+          0, null, now, now));
 
       auditEvents.add(new PolicyAuditEvent(
           traceId,
@@ -151,6 +158,8 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asRuntimeException());
     } catch (Exception ex) {
       responseObserver.onError(Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+    } finally {
+      MDC.clear();
     }
   }
 

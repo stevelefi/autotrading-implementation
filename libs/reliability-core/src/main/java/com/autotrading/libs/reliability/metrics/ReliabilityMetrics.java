@@ -1,9 +1,15 @@
 package com.autotrading.libs.reliability.metrics;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Central reliability-path metrics.
+ * <p>
+ * Counters are monotonically increasing; the outbox backlog age is a gauge.
+ */
 public class ReliabilityMetrics {
   private final AtomicLong duplicateSuppressionCount = new AtomicLong();
   private final AtomicLong firstStatusTimeoutCount = new AtomicLong();
@@ -23,6 +29,9 @@ public class ReliabilityMetrics {
     if (meterRegistry == null) {
       return;
     }
+    // Use gauges backed by AtomicLong counters — these are monotonically increasing
+    // but Gauge is appropriate here because the values are managed manually and we
+    // need reset capability for tests and smoke drills.
     Gauge.builder("autotrading.reliability.duplicate.suppression.count", duplicateSuppressionCount, AtomicLong::doubleValue)
         .description("Number of duplicate events suppressed by consumer inbox dedupe")
         .register(meterRegistry);

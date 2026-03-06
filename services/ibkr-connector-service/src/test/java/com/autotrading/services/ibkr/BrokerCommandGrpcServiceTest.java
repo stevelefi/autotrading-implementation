@@ -21,13 +21,14 @@ import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class BrokerCommandGrpcServiceTest {
 
     private final BrokerConnectorEngine engine = new BrokerConnectorEngine(
             new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
-            mock(OutboxRepository.class), new ObjectMapper());
+            mock(ExecutionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
     private final BrokerCommandGrpcService service = new BrokerCommandGrpcService(engine);
 
     private static RequestContext ctx(String idem) {

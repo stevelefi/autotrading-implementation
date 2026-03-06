@@ -2,11 +2,11 @@ package com.autotrading.services.order.core;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +26,8 @@ import com.autotrading.services.order.db.OrderIntentEntity;
 import com.autotrading.services.order.db.OrderIntentRepository;
 import com.autotrading.services.order.db.OrderLedgerEntity;
 import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryEntity;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
 
 public class OrderSafetyEngine {
   private static final Logger log = LoggerFactory.getLogger(OrderSafetyEngine.class);
@@ -33,9 +35,10 @@ public class OrderSafetyEngine {
   private final IdempotencyService idempotencyService;
   private final OrderIntentRepository orderIntentRepository;
   private final OrderLedgerRepository orderLedgerRepository;
+  private final OrderStateHistoryRepository orderStateHistoryRepository;
   private final Map<String, OrderIntentState> ordersById = new ConcurrentHashMap<>();
   private final Map<String, String> orderIdByKey = new ConcurrentHashMap<>();
-  private final List<String> alertEvents = new ArrayList<>();
+  private final List<String> alertEvents = new CopyOnWriteArrayList<>();
   private final ReliabilityMetrics metrics;
   private final Clock clock;
   private volatile TradingMode tradingMode = TradingMode.NORMAL;
@@ -43,12 +46,14 @@ public class OrderSafetyEngine {
   public OrderSafetyEngine(ReliabilityMetrics metrics, Clock clock,
                            IdempotencyService idempotencyService,
                            OrderIntentRepository orderIntentRepository,
-                           OrderLedgerRepository orderLedgerRepository) {
+                           OrderLedgerRepository orderLedgerRepository,
+                           OrderStateHistoryRepository orderStateHistoryRepository) {
     this.metrics = metrics;
     this.clock = clock;
     this.idempotencyService = idempotencyService;
     this.orderIntentRepository = orderIntentRepository;
     this.orderLedgerRepository = orderLedgerRepository;
+    this.orderStateHistoryRepository = orderStateHistoryRepository;
   }
 
   public CreateOrderIntentResponse createOrderIntent(CreateOrderIntentRequest request,
@@ -138,6 +143,9 @@ public class OrderSafetyEngine {
           now));
       orderLedgerRepository.save(new OrderLedgerEntity(
           orderIntentId, "SUBMIT_REQUESTED", 1L, deadline, now, now));
+      orderStateHistoryRepository.save(new OrderStateHistoryEntity(
+          orderIntentId, 1L, "INTENT_CREATED", "SUBMIT_REQUESTED",
+          "initial broker submission", request.getRequestContext().getTraceId(), now));
       log.info("order-service persisted orderIntentId={} agentId={}", orderIntentId, request.getAgentId());
     } catch (Exception dbEx) {
       log.warn("order-service DB persist failed orderIntentId={} cause={}", orderIntentId, dbEx.getMessage(), dbEx);
@@ -169,6 +177,14 @@ public class OrderSafetyEngine {
         tradingMode = TradingMode.FROZEN;
         alertEvents.add("system.alerts.v1:CRITICAL:status_timeout_60s:" + entry.getKey());
         metrics.incrementFirstStatusTimeoutCount();
+        try {
+          orderStateHistoryRepository.save(new OrderStateHistoryEntity(
+              entry.getKey(), order.stateVersion() + 1L,
+              order.lifecycleState().name(), OrderLifecycleState.UNKNOWN_PENDING_RECON.name(),
+              "60s first-status timeout", "watchdog", now));
+        } catch (Exception histEx) {
+          log.warn("order-service failed to persist timeout history orderId={}", entry.getKey(), histEx);
+        }
         timeouts++;
       }
     }

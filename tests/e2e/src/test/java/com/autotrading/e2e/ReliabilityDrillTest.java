@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.autotrading.libs.reliability.inbox.ConsumerDeduper;
@@ -59,7 +60,8 @@ class ReliabilityDrillTest {
     assertThat(metrics.duplicateSuppressionCount()).isEqualTo(1);
 
     BrokerConnectorEngine connectorEngine = new BrokerConnectorEngine(
-        new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class), outbox, new ObjectMapper());
+        new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
+        mock(ExecutionRepository.class), outbox, new ObjectMapper());
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isTrue();
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isFalse();
   }

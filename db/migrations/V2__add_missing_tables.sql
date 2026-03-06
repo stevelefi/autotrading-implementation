@@ -8,21 +8,18 @@
 
 -- ── Patch existing tables: add missing columns ────────────────────────────────
 
-ALTER TABLE ingress_raw_events
-  ADD COLUMN IF NOT EXISTS source_protocol TEXT,
-  ADD COLUMN IF NOT EXISTS event_intent     TEXT,
-  ADD COLUMN IF NOT EXISTS principal_json   JSONB,
-  ADD COLUMN IF NOT EXISTS integration_id   TEXT;
+ALTER TABLE ingress_raw_events ADD COLUMN IF NOT EXISTS source_protocol TEXT;
+ALTER TABLE ingress_raw_events ADD COLUMN IF NOT EXISTS event_intent     TEXT;
+ALTER TABLE ingress_raw_events ADD COLUMN IF NOT EXISTS principal_json   JSONB;
+ALTER TABLE ingress_raw_events ADD COLUMN IF NOT EXISTS integration_id   TEXT;
 
-ALTER TABLE routed_trade_events
-  ADD COLUMN IF NOT EXISTS instrument_id   TEXT,
-  ADD COLUMN IF NOT EXISTS route_topic     TEXT NOT NULL DEFAULT 'trade.events.routed.v1',
-  ADD COLUMN IF NOT EXISTS routing_status  TEXT NOT NULL DEFAULT 'ROUTED';
+ALTER TABLE routed_trade_events ADD COLUMN IF NOT EXISTS instrument_id   TEXT;
+ALTER TABLE routed_trade_events ADD COLUMN IF NOT EXISTS route_topic     TEXT NOT NULL DEFAULT 'trade.events.routed.v1';
+ALTER TABLE routed_trade_events ADD COLUMN IF NOT EXISTS routing_status  TEXT NOT NULL DEFAULT 'ROUTED';
 
-ALTER TABLE executions
-  ADD COLUMN IF NOT EXISTS commission      NUMERIC(18, 6),
-  ADD COLUMN IF NOT EXISTS agent_id        TEXT,
-  ADD COLUMN IF NOT EXISTS instrument_id   TEXT;
+ALTER TABLE executions ADD COLUMN IF NOT EXISTS commission      NUMERIC(18, 6);
+ALTER TABLE executions ADD COLUMN IF NOT EXISTS agent_id        TEXT;
+ALTER TABLE executions ADD COLUMN IF NOT EXISTS instrument_id   TEXT;
 
 -- ── New tables ────────────────────────────────────────────────────────────────
 
@@ -152,7 +149,7 @@ CREATE TABLE IF NOT EXISTS pnl_snapshots (
 
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 
-CREATE INDEX IF NOT EXISTS idx_ingress_raw_events_source   ON ingress_raw_events (source_type, source_event_id) WHERE source_event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ingress_raw_events_source   ON ingress_raw_events (source_type, source_event_id);
 CREATE INDEX IF NOT EXISTS idx_ingress_raw_events_timeline ON ingress_raw_events (agent_id, received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_routed_events_timeline      ON routed_trade_events (agent_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_signals_agent_ts            ON signals (agent_id, signal_ts DESC);

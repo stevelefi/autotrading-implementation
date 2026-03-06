@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,8 @@ public class AgentRuntimeConsumer {
     } catch (Exception e) {
       log.error("agent-runtime failed to process record offset={} cause={}", record.offset(), e.getMessage(), e);
       throw new RuntimeException("agent-runtime consumer failure", e);
+    } finally {
+      MDC.clear();
     }
   }
 
@@ -68,6 +71,12 @@ public class AgentRuntimeConsumer {
     String agentId = root.path("agentId").asText(null);
     String sourceType = root.path("sourceType").asText("HTTP");
     String sourceEventId = root.path("sourceEventId").asText(null);
+
+    // Set MDC for structured logging
+    MDC.put("trace_id", traceId);
+    MDC.put("idempotency_key", idempotencyKey);
+    MDC.put("request_id", tradeEventId);
+    if (agentId != null) MDC.put("agent_id", agentId);
 
     Instant routedAt;
     try {
@@ -86,6 +95,8 @@ public class AgentRuntimeConsumer {
       try {
         String signalId = "sig-" + UUID.randomUUID();
         String instrumentId = String.valueOf(payload.getOrDefault("instrument_id", "eq_tqqq"));
+        MDC.put("signal_id", signalId);
+        MDC.put("instrument_id", instrumentId);
 
         RoutedToSignalAdapter.RoutedSignalInput input = new RoutedToSignalAdapter.RoutedSignalInput(
             traceId,
@@ -103,9 +114,10 @@ public class AgentRuntimeConsumer {
             payload);
 
         EvaluateSignalRequest riskReq = adapter.toEvaluateSignalRequest(input);
-        log.info("agent-runtime sending gRPC evaluateSignal signalId={} tradeEventId={}", signalId, tradeEventId);
-        riskStub.evaluateSignal(riskReq);
 
+        // Persist signal BEFORE gRPC call — if the process crashes between gRPC
+        // and persist, the signal would be lost. Persist-first guarantees the
+        // signal is always recoverable from DB.
         String rawPayloadJson = objectMapper.writeValueAsString(payload);
         SignalEntity entity = new SignalEntity(
             signalId, tradeEventId,
@@ -119,9 +131,11 @@ public class AgentRuntimeConsumer {
             rawPayloadJson,
             Instant.now());
         signalRepository.save(entity);
-
         log.info("agent-runtime persisted signal signalId={} agentId={} tradeEventId={}",
             signalId, agentId, tradeEventId);
+
+        log.info("agent-runtime sending gRPC evaluateSignal signalId={} tradeEventId={}", signalId, tradeEventId);
+        riskStub.evaluateSignal(riskReq);
       } catch (RuntimeException re) {
         throw re;
       } catch (Exception e) {

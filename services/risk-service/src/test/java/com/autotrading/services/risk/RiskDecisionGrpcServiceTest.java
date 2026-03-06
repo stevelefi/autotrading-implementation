@@ -26,6 +26,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -105,7 +106,8 @@ class RiskDecisionGrpcServiceTest {
     @Test
     void missingLineageFieldsResultInInvalidArgumentError() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(null, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         List<Throwable> errors = new ArrayList<>();
 
         service.evaluateSignal(EvaluateSignalRequest.newBuilder().build(),
@@ -119,7 +121,8 @@ class RiskDecisionGrpcServiceTest {
     @Test
     void externalSystemSourceRequiresOriginEventId() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(null, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         List<Throwable> errors = new ArrayList<>();
 
         service.evaluateSignal(EvaluateSignalRequest.newBuilder()
@@ -142,7 +145,8 @@ class RiskDecisionGrpcServiceTest {
     @Test
     void evaluateSignalSuccessCallsOrderStubAndRecordsAuditEvent() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(orderStub, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         List<EvaluateSignalResponse> responses = new ArrayList<>();
         List<Throwable> errors = new ArrayList<>();
 
@@ -158,7 +162,8 @@ class RiskDecisionGrpcServiceTest {
     @Test
     void multipleSuccessfulCallsAccumulateAuditEvents() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(orderStub, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
 
         service.evaluateSignal(fullRequest("idem-a"), collector(new ArrayList<>(), new ArrayList<>()));
         service.evaluateSignal(fullRequest("idem-b"), collector(new ArrayList<>(), new ArrayList<>()));
@@ -173,7 +178,8 @@ class RiskDecisionGrpcServiceTest {
     @Test
     void auditEventsAreEmptyInitially() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(null, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         assertThat(service.auditEvents()).isEmpty();
     }
 }

@@ -6,6 +6,7 @@ import io.grpc.ServerInterceptor;
 import io.grpc.ServerInterceptors;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
@@ -17,7 +18,7 @@ public class RiskGrpcServerLifecycle implements SmartLifecycle {
   private final ServerInterceptor correlationInterceptor;
   private final int port;
   private volatile boolean running;
-  private Server server;
+  private volatile Server server;
 
   public RiskGrpcServerLifecycle(RiskDecisionGrpcService service, ServerInterceptor correlationInterceptor, int port) {
     this.service = service;
@@ -46,6 +47,15 @@ public class RiskGrpcServerLifecycle implements SmartLifecycle {
   public void stop() {
     if (server != null) {
       server.shutdown();
+      try {
+        if (!server.awaitTermination(5, TimeUnit.SECONDS)) {
+          server.shutdownNow();
+          log.warn("risk gRPC server forced shutdown after 5s timeout");
+        }
+      } catch (InterruptedException e) {
+        server.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
     }
     running = false;
   }

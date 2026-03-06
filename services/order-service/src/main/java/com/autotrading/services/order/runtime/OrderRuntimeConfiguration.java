@@ -16,6 +16,7 @@ import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.core.OrderSafetyEngine;
 import com.autotrading.services.order.db.OrderIntentRepository;
 import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
 import com.autotrading.services.order.grpc.OrderCommandGrpcService;
 
 import io.grpc.ManagedChannel;
@@ -54,9 +55,10 @@ public class OrderRuntimeConfiguration {
   OrderSafetyEngine orderSafetyEngine(ReliabilityMetrics reliabilityMetrics, Clock clock,
                                        IdempotencyService idempotencyService,
                                        OrderIntentRepository orderIntentRepository,
-                                       OrderLedgerRepository orderLedgerRepository) {
+                                       OrderLedgerRepository orderLedgerRepository,
+                                       OrderStateHistoryRepository orderStateHistoryRepository) {
     return new OrderSafetyEngine(reliabilityMetrics, clock, idempotencyService,
-        orderIntentRepository, orderLedgerRepository);
+        orderIntentRepository, orderLedgerRepository, orderStateHistoryRepository);
   }
 
   @Bean

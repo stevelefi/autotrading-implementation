@@ -24,6 +24,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -63,7 +64,8 @@ class RiskSmokeControllerTest {
     @Test
     void statsReturnsZeroAuditEventsInitially() {
         RiskDecisionGrpcService riskService = new RiskDecisionGrpcService(null, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         RiskSmokeController controller = new RiskSmokeController(riskService);
 
         Map<String, Object> stats = controller.stats();
@@ -75,7 +77,8 @@ class RiskSmokeControllerTest {
     @Test
     void statsReflectsAuditEventCountAfterSuccessfulEvaluation() {
         RiskDecisionGrpcService riskService = new RiskDecisionGrpcService(orderStub, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         RiskSmokeController controller = new RiskSmokeController(riskService);
 
         riskService.evaluateSignal(fullRequest("idem-stats"), new StreamObserver<EvaluateSignalResponse>() {
@@ -91,7 +94,8 @@ class RiskSmokeControllerTest {
     @Test
     void commandPathWithNullPayloadUsesDefaultsAndReturnsDecision() {
         RiskDecisionGrpcService riskService = new RiskDecisionGrpcService(orderStub, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         RiskSmokeController controller = new RiskSmokeController(riskService);
 
         Map<String, Object> result = controller.commandPath(null);
@@ -104,7 +108,8 @@ class RiskSmokeControllerTest {
     @Test
     void commandPathWithExplicitPayloadUsesProvidedValues() {
         RiskDecisionGrpcService riskService = new RiskDecisionGrpcService(orderStub, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         RiskSmokeController controller = new RiskSmokeController(riskService);
 
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
@@ -123,7 +128,8 @@ class RiskSmokeControllerTest {
     @Test
     void commandPathIncrementsAuditEventCount() {
         RiskDecisionGrpcService riskService = new RiskDecisionGrpcService(orderStub, policyEngine,
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         RiskSmokeController controller = new RiskSmokeController(riskService);
 
         controller.commandPath(null);

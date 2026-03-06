@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.services.order.db.OrderIntentRepository;
 import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +55,8 @@ class OrderSafetyEngineTest {
     OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
         new InMemoryIdempotencyService(),
         mock(OrderIntentRepository.class),
-        mock(OrderLedgerRepository.class));
+        mock(OrderLedgerRepository.class),
+        mock(OrderStateHistoryRepository.class));
 
     CreateOrderIntentRequest request = baseRequest("idem-timeout");
     var response = engine.createOrderIntent(request, brokerStub);
@@ -79,7 +81,8 @@ class OrderSafetyEngineTest {
     OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
         new InMemoryIdempotencyService(),
         mock(OrderIntentRepository.class),
-        mock(OrderLedgerRepository.class));
+        mock(OrderLedgerRepository.class),
+        mock(OrderStateHistoryRepository.class));
 
     CreateOrderIntentRequest request = baseRequest("idem-duplicate");
     var first = engine.createOrderIntent(request, brokerStub);
@@ -100,7 +103,8 @@ class OrderSafetyEngineTest {
     OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
         new InMemoryIdempotencyService(),
         mock(OrderIntentRepository.class),
-        mock(OrderLedgerRepository.class));
+        mock(OrderLedgerRepository.class),
+        mock(OrderStateHistoryRepository.class));
 
     CreateOrderIntentRequest deniedRequest = baseRequest("idem-denied").toBuilder()
         .setDecision(Decision.DECISION_DENY)
@@ -122,7 +126,8 @@ class OrderSafetyEngineTest {
     OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
         new InMemoryIdempotencyService(),
         mock(OrderIntentRepository.class),
-        mock(OrderLedgerRepository.class));
+        mock(OrderLedgerRepository.class),
+        mock(OrderStateHistoryRepository.class));
 
     var created = engine.createOrderIntent(baseRequest("idem-ack"), brokerStub);
     engine.onBrokerStatus(created.getOrderIntentId());
@@ -145,7 +150,8 @@ class OrderSafetyEngineTest {
     OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
         new InMemoryIdempotencyService(),
         mock(OrderIntentRepository.class),
-        mock(OrderLedgerRepository.class));
+        mock(OrderLedgerRepository.class),
+        mock(OrderStateHistoryRepository.class));
 
     CreateOrderIntentRequest first = baseRequest("idem-conflict");
     CreateOrderIntentRequest conflicting = first.toBuilder().setQty(999).build();

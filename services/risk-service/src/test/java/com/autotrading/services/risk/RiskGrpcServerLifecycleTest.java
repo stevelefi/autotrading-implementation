@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,8 @@ class RiskGrpcServerLifecycleTest {
 
     private RiskGrpcServerLifecycle buildLifecycle() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(null, new SimplePolicyEngine(),
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         return new RiskGrpcServerLifecycle(service, NOOP, 0);
     }
 
@@ -67,7 +69,8 @@ class RiskGrpcServerLifecycleTest {
     @Test
     void startBindsPortAndSetsRunning() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(null, new SimplePolicyEngine(),
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         // port 0 → OS picks a free ephemeral port
         RiskGrpcServerLifecycle lifecycle = new RiskGrpcServerLifecycle(service, NOOP, 0);
         try {
@@ -81,7 +84,8 @@ class RiskGrpcServerLifecycleTest {
     @Test
     void startIsIdempotentWhenAlreadyRunning() {
         RiskDecisionGrpcService service = new RiskDecisionGrpcService(null, new SimplePolicyEngine(),
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         RiskGrpcServerLifecycle lifecycle = new RiskGrpcServerLifecycle(service, NOOP, 0);
         try {
             lifecycle.start();

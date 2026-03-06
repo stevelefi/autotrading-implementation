@@ -39,6 +39,10 @@ public class KafkaOutboxPublisher implements OutboxPublisher {
           event.topic(),
           result.getRecordMetadata().partition(),
           result.getRecordMetadata().offset());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      log.warn("outbox publish interrupted eventId={} topic={}", event.eventId(), event.topic());
+      throw e;
     } catch (ExecutionException | TimeoutException e) {
       log.warn("outbox publish failed eventId={} topic={}: {}", event.eventId(), event.topic(), e.getMessage());
       throw e;

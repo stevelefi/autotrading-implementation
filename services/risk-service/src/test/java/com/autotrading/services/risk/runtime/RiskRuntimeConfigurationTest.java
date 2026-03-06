@@ -3,6 +3,7 @@ package com.autotrading.services.risk.runtime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -52,14 +53,16 @@ class RiskRuntimeConfigurationTest {
     @Test
     void riskDecisionGrpcServiceBeanIsCreated() {
         RiskDecisionGrpcService service = config.riskDecisionGrpcService(null, config.simplePolicyEngine(),
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         assertThat(service).isNotNull();
     }
 
     @Test
     void riskGrpcServerLifecycleBeanIsCreated() {
         RiskDecisionGrpcService service = config.riskDecisionGrpcService(null, config.simplePolicyEngine(),
-                mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+                mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
+                mock(OutboxRepository.class), new ObjectMapper());
         GrpcCorrelationServerInterceptor interceptor = new GrpcCorrelationServerInterceptor();
         RiskGrpcServerLifecycle lifecycle = config.riskGrpcServerLifecycle(service, interceptor, 0);
         assertThat(lifecycle).isNotNull();

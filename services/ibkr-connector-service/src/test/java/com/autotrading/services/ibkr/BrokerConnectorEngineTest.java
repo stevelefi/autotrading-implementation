@@ -15,6 +15,7 @@ import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderEntity;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class BrokerConnectorEngineTest {
     engine = new BrokerConnectorEngine(
         new InMemoryIdempotencyService(),
         mockRepo,
+        mock(ExecutionRepository.class),
         mockOutbox,
         new ObjectMapper());
   }

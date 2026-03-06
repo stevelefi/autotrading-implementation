@@ -1,5 +1,6 @@
 package com.autotrading.services.ibkr.core;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
@@ -26,7 +27,10 @@ import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.libs.reliability.outbox.OutboxStatus;
 import com.autotrading.services.ibkr.db.BrokerOrderEntity;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionEntity;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.transaction.annotation.Transactional;
 
 public class BrokerConnectorEngine {
 
@@ -34,6 +38,7 @@ public class BrokerConnectorEngine {
 
   private final IdempotencyService idempotencyService;
   private final BrokerOrderRepository brokerOrderRepository;
+  private final ExecutionRepository executionRepository;
   private final OutboxRepository outboxRepository;
   private final ObjectMapper objectMapper;
   private final Map<String, SubmitOrderResponse> submitReplay = new ConcurrentHashMap<>();
@@ -42,14 +47,17 @@ public class BrokerConnectorEngine {
 
   public BrokerConnectorEngine(IdempotencyService idempotencyService,
                                 BrokerOrderRepository brokerOrderRepository,
+                                ExecutionRepository executionRepository,
                                 OutboxRepository outboxRepository,
                                 ObjectMapper objectMapper) {
     this.idempotencyService = idempotencyService;
     this.brokerOrderRepository = brokerOrderRepository;
+    this.executionRepository = executionRepository;
     this.outboxRepository = outboxRepository;
     this.objectMapper = objectMapper;
   }
 
+  @Transactional
   public SubmitOrderResponse submit(SubmitOrderRequest request) {
     String key = request.getRequestContext().getIdempotencyKey();
     String payloadHash = request.getOrderIntentId() + ":" + request.getQty() + ":" + request.getOrderType();
@@ -72,6 +80,7 @@ public class BrokerConnectorEngine {
     }
 
     String brokerSubmitId = "broker-submit-" + UUID.randomUUID();
+    String orderRef = request.getAgentId() + ":" + request.getOrderIntentId();
     Instant now = Instant.now();
     submitCountsByOrderIntent.computeIfAbsent(request.getOrderIntentId(), ignored -> new AtomicInteger()).incrementAndGet();
 
@@ -90,7 +99,7 @@ public class BrokerConnectorEngine {
       brokerOrderRepository.save(new BrokerOrderEntity(
           brokerSubmitId,
           request.getOrderIntentId(),
-          brokerSubmitId,
+          orderRef,
           null,
           request.getAgentId(),
           request.getInstrumentId().isBlank() ? null : request.getInstrumentId(),
@@ -150,6 +159,61 @@ public class BrokerConnectorEngine {
     return submitCountsByOrderIntent.values().stream().mapToInt(AtomicInteger::get).sum();
   }
 
+  /**
+   * Records a fill execution from the broker callback.
+   * Deduplicates by execId, persists to executions table, and publishes fills.executed.v1 outbox event.
+   *
+   * @return true if this was a new execution, false if duplicate
+   */
+  @Transactional
+  public boolean recordExecution(String execId, String orderIntentId, String brokerOrderId,
+                                  String agentId, String instrumentId, String side,
+                                  BigDecimal fillQty, BigDecimal fillPrice, BigDecimal commission,
+                                  Instant fillTs) {
+    if (!seenExecIds.add(execId)) {
+      log.debug("duplicate execution ignored execId={}", execId);
+      return false;
+    }
+
+    Instant now = Instant.now();
+    try {
+      ExecutionEntity entity = new ExecutionEntity(
+          execId, orderIntentId, brokerOrderId, agentId, instrumentId,
+          side, fillQty.intValue(), fillPrice,
+          commission != null ? commission : BigDecimal.ZERO,
+          fillTs, now);
+      executionRepository.save(entity);
+
+      String fillPayload = objectMapper.writeValueAsString(Map.of(
+          "execId", execId,
+          "orderIntentId", orderIntentId,
+          "brokerOrderId", brokerOrderId,
+          "agentId", agentId,
+          "instrumentId", instrumentId != null ? instrumentId : "",
+          "side", side,
+          "fillQty", fillQty.toPlainString(),
+          "fillPrice", fillPrice.toPlainString(),
+          "commission", commission != null ? commission.toPlainString() : "0",
+          "fillTs", fillTs.toString()));
+
+      outboxRepository.append(new OutboxEvent(
+          "fill-" + UUID.randomUUID(),
+          "fills.executed.v1",
+          agentId,
+          fillPayload,
+          OutboxStatus.NEW,
+          0, null, now, now));
+
+      log.info("execution recorded execId={} orderIntentId={} qty={} price={}",
+          execId, orderIntentId, fillQty, fillPrice);
+    } catch (Exception e) {
+      log.error("failed to persist execution execId={} cause={}", execId, e.getMessage(), e);
+      seenExecIds.remove(execId); // allow retry
+    }
+    return true;
+  }
+
+  /** Simple overload for backward compatibility / lightweight dedup only. */
   public boolean recordExecution(String execId) {
     return seenExecIds.add(execId);
   }

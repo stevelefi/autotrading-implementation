@@ -12,6 +12,7 @@ import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.services.order.db.OrderIntentRepository;
 import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,8 @@ class OrderSmokeControllerTest {
         engine     = new OrderSafetyEngine(metrics, clock,
                 new InMemoryIdempotencyService(),
                 mock(OrderIntentRepository.class),
-                mock(OrderLedgerRepository.class));
+                mock(OrderLedgerRepository.class),
+                mock(OrderStateHistoryRepository.class));
         controller = new OrderSmokeController(engine, brokerStub, metrics, clock);
     }
 
