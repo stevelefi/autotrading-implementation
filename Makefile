@@ -4,10 +4,7 @@ STACK := python3 scripts/stack.py
 .PHONY: up up-infra up-app down down-infra restart restart-app build status logs validate ci-local \
         test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec \
 	helm-lint helm-template pre-commit \
-	docs-serve docs-build docs-install
-
-build:
-	$(STACK) build
+	docs-install docs-serve docs-build docs-up docs-down docs-validate
 
 up:
 	$(STACK) up
@@ -80,4 +77,23 @@ docs-serve:
 docs-build:
 	mkdocs build --strict --site-dir _site
 	@echo "Site built → _site/"
+
+docs-up:
+	@echo "Starting docs preview containers..."
+	docker compose -f docker-compose.docs.yml up -d --pull missing
+	@echo ""
+	@echo "  impl docs  →  http://localhost:8001"
+	@echo "  spec docs  →  http://localhost:8002"
+	@echo ""
+	@echo "Run 'make docs-down' to stop."
+
+docs-down:
+	docker compose -f docker-compose.docs.yml down
+
+docs-validate:
+	@echo "=== Validating impl docs (strict) ==="
+	docker compose -f docker-compose.docs.yml run --rm impl-docs build --strict --site-dir /tmp/_site
+	@echo "=== Validating spec docs (strict) ==="
+	docker compose -f docker-compose.docs.yml run --rm spec-docs build --strict --site-dir /tmp/_site
+	@echo "=== Both sites validated successfully ==="
 

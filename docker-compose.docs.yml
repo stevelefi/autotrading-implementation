@@ -1,0 +1,34 @@
+# docker-compose.docs.yml — local documentation preview
+#
+# Spins up both MkDocs sites as containers so you can validate
+# before pushing to GitHub Pages.
+#
+# Usage:
+#   make docs-up       → start both sites (live-reload)
+#   make docs-down     → stop both sites
+#   make docs-validate → strict one-shot build (exit 1 on any warning)
+#
+# Sites:
+#   http://localhost:8001  →  autotrading-implementation (this repo)
+#   http://localhost:8002  →  autotrading spec/design repo
+
+services:
+  impl-docs:
+    image: squidfunk/mkdocs-material:9.5.39
+    container_name: docs-impl
+    ports:
+      - "8001:8000"
+    volumes:
+      - .:/docs
+    command: serve --dev-addr=0.0.0.0:8000
+    working_dir: /docs
+
+  spec-docs:
+    image: squidfunk/mkdocs-material:9.5.39
+    container_name: docs-spec
+    ports:
+      - "8002:8000"
+    volumes:
+      - ../autotrading:/docs
+    command: serve --dev-addr=0.0.0.0:8000
+    working_dir: /docs
