@@ -16,7 +16,7 @@ After `make up`, all dashboards are available locally:
 | **Loki API** | http://localhost:3100 | Log aggregation backend (query via Grafana Explore or `trace.py`) |
 | **OTel Collector** | grpc:4317 / http:4318 | Receives traces+logs from all 8 services, forwards to Loki |
 
-Grafana credentials: set in `.env` (`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`); defaults to `admin`/`admin`.
+Grafana credentials: set via `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` in `infra/local/.env.compose.example` (copy to `.env.compose` before first run); defaults to `admin`/`admin`.
 
 ---
 
@@ -140,20 +140,23 @@ http://monitoring-api:8080/actuator/prometheus
 
 ### Topics Tab
 
-View all 10 production topics + their message count and partition layout:
+The stack initializes 13 topics at startup (`redpanda-init` container). 10 carry the active production flow; 3 are scaffolded for future use:
 
-| Topic | Key flow |
-|---|---|
-| `ingress.events.normalized.v1` | ingress → event-processor |
-| `trade.events.routed.v1` | event-processor → agent-runtime |
-| `orders.status.v1` | ibkr-connector → monitoring-api, order-service |
-| `fills.executed.v1` | ibkr-connector → performance-service |
-| `policy.evaluations.audit.v1` | risk-service → monitoring-api |
-| `positions.updated.v1` | performance-service → monitoring-api |
-| `pnl.snapshots.v1` | performance-service → monitoring-api |
-| `risk.events.v1` | risk-service → monitoring-api |
-| `system.alerts.v1` | order-service → monitoring-api |
-| `ingress.errors.v1` | ingress-gateway → monitoring-api |
+| Topic | Key flow | Status |
+|---|---|---|
+| `ingress.events.normalized.v1` | ingress → event-processor | active |
+| `ingress.errors.v1` | ingress-gateway → monitoring-api | active |
+| `trade.events.routed.v1` | event-processor → agent-runtime | active |
+| `orders.status.v1` | ibkr-connector → monitoring-api, order-service | active |
+| `fills.executed.v1` | ibkr-connector → performance-service | active |
+| `policy.evaluations.audit.v1` | risk-service → monitoring-api | active |
+| `positions.updated.v1` | performance-service → monitoring-api | active |
+| `pnl.snapshots.v1` | performance-service → monitoring-api | active |
+| `risk.events.v1` | risk-service → monitoring-api | active |
+| `system.alerts.v1` | order-service → monitoring-api | active |
+| `signals.generated.v1` | — | scaffolded |
+| `risk.decisions.v1` | — | scaffolded |
+| `orders.intents.v1` | — | scaffolded |
 
 Click a topic → **Messages** tab to browse individual messages with offsets and timestamps.
 
@@ -178,10 +181,20 @@ curl -s http://localhost:18085/actuator/health/readiness | jq .
 curl -s http://localhost:18086/actuator/health/readiness | jq .
 curl -s http://localhost:18087/actuator/health/readiness | jq .
 
-# All services in one script
+# All services in one script (with service names)
+declare -A SERVICE_PORTS=(
+  [18080]=ingress-gateway-service
+  [18081]=risk-service
+  [18082]=order-service
+  [18083]=ibkr-connector-service
+  [18084]=monitoring-api
+  [18085]=event-processor-service
+  [18086]=agent-runtime-service
+  [18087]=performance-service
+)
 for port in 18080 18081 18082 18083 18084 18085 18086 18087; do
   status=$(curl -s http://localhost:$port/actuator/health/readiness | jq -r '.status' 2>/dev/null || echo "UNREACHABLE")
-  echo "port $port: $status"
+  printf "%-35s (port %s): %s\n" "${SERVICE_PORTS[$port]}" "$port" "$status"
 done
 ```
 
@@ -201,8 +214,14 @@ python3 scripts/trace.py --idempotency-key k-abc-123
 # All activity for an agent in the last 30 minutes
 python3 scripts/trace.py --agent-id agent-alpha --since 30m
 
-# All activity for a specific order intent
+# All activity for a specific signal (agent-runtime → risk)
+python3 scripts/trace.py --signal-id sig-xyz
+
+# All activity for a specific order intent (risk → order → broker)
 python3 scripts/trace.py --order-intent-id oi-xyz-789
+
+# All activity on one symbol across all services
+python3 scripts/trace.py --instrument-id AAPL --since 30m
 
 # Scope to a single service
 python3 scripts/trace.py --trace-id trc-abc-123 --service risk-service
@@ -458,6 +477,28 @@ docker exec redpanda rpk group describe <group-id>
 #   agent-runtime-group
 #   performance-group
 #   monitoring-group
+```
+
+---
+
+### Service not ready (`UNREACHABLE` or `DOWN`)
+
+```bash
+# Check container status and recent logs
+docker compose -f infra/local/docker-compose.yml ps
+docker compose -f infra/local/docker-compose.yml logs --tail=50 <service-name>
+
+# Check readiness in detail (includes DB + Kafka sub-components)
+curl -s http://localhost:<port>/actuator/health | jq .
+
+# Common causes:
+# - postgres not ready yet → wait for flyway-init container to complete
+# - Kafka not ready → check redpanda container health
+# - gRPC dependency not up → check upstream service (order depends on ibkr-connector, etc.)
+# Service startup order enforced by healthcheck depends_on in docker-compose.yml
+
+# Force restart a specific service
+docker compose -f infra/local/docker-compose.yml restart <service-name>
 ```
 
 ---

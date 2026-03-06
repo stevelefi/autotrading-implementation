@@ -80,18 +80,25 @@ Artifacts uploaded on every run:
 
 Local stack via `infra/local/docker-compose.yml` includes: `otel-collector`, `prometheus`, `loki`, `promtail`, `grafana`.
 
+See **[docs/OBSERVABILITY.md](OBSERVABILITY.md)** for UIs, LogQL/PromQL queries, alert runbooks, and the `trace.py` CLI.
+
 Every service must:
 - Expose `/actuator/health`, `/actuator/info`, `/actuator/prometheus`
 - Emit structured logs with the full correlation MDC key set:
   `trace_id`, `request_id`, `idempotency_key`, `principal_id`, `agent_id`, `signal_id`, `order_intent_id`, `instrument_id`
 - Propagate correlation context via `GrpcCorrelationServerInterceptor` (gRPC) and `HttpCorrelationFilter` (HTTP)
 
+Telemetry split:
+- **Metrics** — scraped by Prometheus via `/actuator/prometheus` (not via OTel; `OTEL_METRICS_EXPORTER: none` in docker-compose)
+- **Logs** — shipped via OTel OTLP/HTTP to `otel-collector` → Loki, and also captured by Promtail from Docker stdout
+- **Traces** — shipped via OTel OTLP/HTTP to `otel-collector` → `debug` exporter (stdout); add Grafana Tempo for persistent trace storage
+
 Reliability telemetry required in dashboards and alerts:
 - `autotrading_reliability_outbox_backlog_age_ms`
 - `autotrading_reliability_duplicate_suppression_count`
 - `autotrading_reliability_first_status_timeout_count`
 
-To add a new telemetry vendor: add an exporter to `infra/observability/otel-collector/config.yaml` — no app rewrites needed.
+To add a new **log/trace** export target: add an exporter to `infra/observability/otel-collector/config.yaml` — no app rewrites needed. For a new **metrics** target: add a scrape job to `infra/observability/prometheus/prometheus.yml`.
 
 ## 5. Reliability and Safety Expectations
 

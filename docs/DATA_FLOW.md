@@ -226,15 +226,24 @@ The `idempotency_records` table survives restarts. In-memory replay caches (`sub
 
 ## 6. Monitoring and Control Plane
 
+All endpoints served by `monitoring-api` on HTTP :18084.
+
 ```
-POST /api/v1/system/kill-switch     {"enabled": true}
-POST /api/v1/system/trading-mode    {"trading_mode": "NORMAL"}
-GET  /api/v1/system/health
-GET  /api/v1/system/consistency-status
-GET  /api/v1/system/alerts
-GET  /api/v1/stream/events          (SSE stream)
-POST /api/v1/trade-events/manual    (manual order injection)
-POST /api/v1/trade-events/external  (external system events)
+# Control
+POST /api/v1/system/kill-switch     {"enabled": true|false}
+POST /api/v1/system/trading-mode    {"trading_mode": "NORMAL"|"FROZEN"}
+
+# Status
+GET  /api/v1/system/health              → {tradingMode, killSwitch, serviceStatus}
+GET  /api/v1/system/consistency-status  → cross-service state coherence check
+GET  /api/v1/system/alerts              → recent system.alerts.v1 messages
+
+# Streaming
+GET  /api/v1/stream/events              → SSE stream of live events (all topics)
+
+# Manual injection (bypass ingress validation in test/debug scenarios)
+POST /api/v1/trade-events/manual
+POST /api/v1/trade-events/external
 ```
 
 State management:
