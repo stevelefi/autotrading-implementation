@@ -19,7 +19,7 @@ RUN apt-get update \
     && curl -fsSL -o /otel/opentelemetry-javaagent.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVAAGENT_VERSION}/opentelemetry-javaagent.jar \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /workspace/services/order-service/target/order-service-0.1.0-SNAPSHOT.jar /app/app.jar
+COPY --from=build /workspace/services/order-service/target/order-service-0.1.0-SNAPSHOT-exec.jar /app/app.jar
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
