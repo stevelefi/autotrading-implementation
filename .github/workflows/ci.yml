@@ -43,5 +43,5 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Core module coverage gate (line >= 70%)
+      - name: Core module coverage gate (line >= 50%)
         run: make test-coverage-core
