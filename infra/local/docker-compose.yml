@@ -34,6 +34,35 @@ services:
       timeout: 10s
       retries: 10
 
+  redpanda-init:
+    image: redpandadata/redpanda:v24.1.8
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        BROKERS=redpanda:${KAFKA_PORT}
+        # Create all topics in one call; ignore TOPIC_ALREADY_EXISTS on re-runs
+        rpk topic create \
+          ingress.events.normalized.v1 \
+          ingress.errors.v1 \
+          trade.events.routed.v1 \
+          orders.status.v1 \
+          fills.executed.v1 \
+          policy.evaluations.audit.v1 \
+          positions.updated.v1 \
+          pnl.snapshots.v1 \
+          risk.events.v1 \
+          system.alerts.v1 \
+          signals.generated.v1 \
+          risk.decisions.v1 \
+          orders.intents.v1 \
+          --brokers $$BROKERS --partitions 3 --replicas 1 || true
+        echo "Topic init complete. Current topics:"
+        rpk topic list --brokers $$BROKERS
+    restart: "no"
+
   redpanda-console:
     image: redpandadata/console:v2.8.10
     environment:

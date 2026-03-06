@@ -35,6 +35,7 @@ COMPOSE_FILE = ROOT / "infra/local/docker-compose.yml"
 INFRA_SERVICES = [
     "postgres",
     "redpanda",
+    "redpanda-init",
     "redpanda-console",
     "otel-collector",
     "prometheus",
