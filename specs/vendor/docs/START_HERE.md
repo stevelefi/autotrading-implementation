@@ -5,23 +5,25 @@ Use this page to navigate the docs in the right order.
 ## Fastest Path (15-20 min)
 1. [Trading System Overview](./TRADING_SYSTEM_OVERVIEW.md)
 2. [Production Plan](./PRODUCTION_PLAN.md)
-3. [Trading Architecture](./TRADING_ARCHITECTURE.md)
-4. [Architecture Review Diagrams](./ARCHITECTURE_REVIEW_DIAGRAMS.md)
-5. [Current Design Baseline](./current-design-baseline.md)
-6. [Sequence Diagrams](./design/04-sequence-diagrams.md)
-7. [Component Interactions and Documentation Plan](./design/17-component-interactions-and-doc-plan.md)
-8. [Design Planning Kickoff](./design/18-design-planning-kickoff.md)
-9. [Component Contract Matrix](./design/19-component-contract-matrix.md)
-10. [Service Contracts](./SERVICE_CONTRACTS.md)
-11. [Contracts Readiness and Extensibility](./CONTRACTS_READINESS_AND_EXTENSIBILITY.md)
+3. [Who Owns What: Team Roles and Responsibilities](./TEAM_ROLES_AND_RESPONSIBILITIES.md)
+4. [Trading Architecture](./TRADING_ARCHITECTURE.md)
+5. [Architecture Review Diagrams](./ARCHITECTURE_REVIEW_DIAGRAMS.md)
+6. [Current Design Baseline](./current-design-baseline.md)
+7. [Sequence Diagrams](./design/04-sequence-diagrams.md)
+8. [Component Interactions and Documentation Plan](./design/17-component-interactions-and-doc-plan.md)
+9. [Design Planning Kickoff](./design/18-design-planning-kickoff.md)
+10. [Component Contract Matrix](./design/19-component-contract-matrix.md)
+11. [Service Contracts](./SERVICE_CONTRACTS.md)
+12. [Contracts Readiness and Extensibility](./CONTRACTS_READINESS_AND_EXTENSIBILITY.md)
 
 ## By Role
 
 ### Founder / Product / Ops
 1. [Trading System Overview](./TRADING_SYSTEM_OVERVIEW.md)
 2. [Production Plan](./PRODUCTION_PLAN.md)
-3. [Task Tracking Guide](./TASK_TRACKING_GUIDE.md)
-4. [Trading Ops Runbook](./runbooks/trading-ops.md)
+3. [Who Owns What: Team Roles and Responsibilities](./TEAM_ROLES_AND_RESPONSIBILITIES.md)
+4. [Task Tracking Guide](./TASK_TRACKING_GUIDE.md)
+5. [Trading Ops Runbook](./runbooks/trading-ops.md)
 
 ### Backend Engineers
 1. [Trading Architecture](./TRADING_ARCHITECTURE.md)

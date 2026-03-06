@@ -31,8 +31,8 @@ mkdocs build --strict
 
 ## Run plan-sync validation
 ```bash
-mvn -q -pl tools/plan-sync -am package
-java -jar tools/plan-sync/target/plan-sync.jar validate --tasks docs/tasks.yaml
+pip install -r requirements-plan-sync.txt
+python tools/plan_sync.py validate --tasks docs/tasks.yaml
 ```
 
 ## DEV Policy

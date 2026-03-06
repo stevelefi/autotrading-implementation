@@ -76,6 +76,20 @@
             "items": {
               "type": "string"
             }
+          },
+          "milestone": {
+            "type": "string"
+          },
+          "blocked_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^ATP-[A-Z0-9]+$"
+            }
+          },
+          "target_date": {
+            "type": "string",
+            "format": "date"
           }
         }
       }

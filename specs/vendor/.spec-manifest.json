@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-03-05T21:25:17Z",
+  "generated_at_utc": "2026-03-06T00:43:35Z",
   "root": "docs",
   "files": [
     {
@@ -16,7 +16,7 @@
     },
     {
       "path": "docs/COMPONENTS_AND_OWNERSHIP.md",
-      "sha256": "fae7d928015172e416febaa97feb606f5eb5a2ffd30bf46e61f1700f56917893"
+      "sha256": "7390bac38f122504c2e6c172c5ba1c968e791f5a2df4cb8709c04736ff8334ae"
     },
     {
       "path": "docs/CONTRACTS_READINESS_AND_EXTENSIBILITY.md",
@@ -28,7 +28,7 @@
     },
     {
       "path": "docs/DELIVERABLES_AND_MILESTONES.md",
-      "sha256": "78e8848e86298a00d2e4a972976b4e9bb24b7ca85f0a8e96077f1be82b76dacf"
+      "sha256": "62ef08813824996d0a0aca12be504f30e4cbdf538bded53fcc45dcbba3814a09"
     },
     {
       "path": "docs/DEPLOYMENT_AND_ENVIRONMENTS.md",
@@ -39,12 +39,16 @@
       "sha256": "91ad764fb1ca87f01df8b8ec27d8d21516cd36787cce64be38c0ad93d49c28cc"
     },
     {
+      "path": "docs/DEVOPS_BLITZ_4_DAY_PLAYBOOK.md",
+      "sha256": "9af77db546d62c7fd122eddb757621df78db42ec9a104caebc3e83966962419e"
+    },
+    {
       "path": "docs/DEV_WORKFLOW_DOCKER.md",
-      "sha256": "d2ca801611985d2ca542860f532608d0ec1baf4f3838d74322c8568a134b75a6"
+      "sha256": "53fe8b639be7fec04a04dfbfd3f1777a6e01ceb455f05824bca6e6a64f932f5e"
     },
     {
       "path": "docs/DOCS_INDEX.md",
-      "sha256": "35652b614b095fafb21353838b3dd567c57fab0901af704741e6bae030c8c0e0"
+      "sha256": "550239a9da58c99dc01b1a3d17a97ecd615337ea27a8900ae75798740161e1a2"
     },
     {
       "path": "docs/IBKR_GATEWAY_SIMULATOR.md",
@@ -52,15 +56,15 @@
     },
     {
       "path": "docs/IMPLEMENTATION_PHASES.md",
-      "sha256": "3cbaad0942d9da1938eb15a8078b6059ec23f32600e6bb105f3c7f01cdd9a92b"
+      "sha256": "7d71356db47ec837312f90732d9fea4068c7077e59ec20afc5bc52eef77038c9"
     },
     {
       "path": "docs/IMPLEMENTATION_PLAN.md",
-      "sha256": "38c95d0afb38e916267a785716d250cf1a2a397d8de82a7d7c3c65712c02d218"
+      "sha256": "387c8c7e904b4c9aafce5f7f63250a454e2eb5d27abe631b33392382d1caf3ea"
     },
     {
       "path": "docs/IMPLEMENTATION_ROADMAP.md",
-      "sha256": "bb25dbc542963c67dcd3ffb972c6542455ee57aedf198bf81b26e884f8fb9892"
+      "sha256": "1467359d9cea7f2df12bfc382134e9b2049ed55c1b9e3516c7e9eee1a61a6ee3"
     },
     {
       "path": "docs/INSTRUMENTS_AND_MARKETS.md",
@@ -84,7 +88,7 @@
     },
     {
       "path": "docs/PRODUCTION_PLAN.md",
-      "sha256": "acd9e3968a78e9cd98757114542442c66ab0aeb8f3ac410af9d8cde425563a03"
+      "sha256": "606f98a6f9581297de65a22dc1362fad91c02c4338a2e9541bb491ef3f9a5e01"
     },
     {
       "path": "docs/RULE_ENGINE_OPA.md",
@@ -108,11 +112,15 @@
     },
     {
       "path": "docs/START_HERE.md",
-      "sha256": "32c1dcd3f95511dc80967e6e7445426ac985f6f34011b35eabe7e34bff7e3653"
+      "sha256": "521b5b292e6926046bec3cf310d5acf12c2883c636917f55810f660f8e2b1380"
     },
     {
       "path": "docs/TASK_TRACKING_GUIDE.md",
-      "sha256": "e40bc263b06cf7dd0cd3904ec47fc36373f406442e3d80be35dd307f7caf666a"
+      "sha256": "d13bbbf2e48c7a1c229a4505f95199198585023423af66404f9df9bebfd01a3f"
+    },
+    {
+      "path": "docs/TEAM_ROLES_AND_RESPONSIBILITIES.md",
+      "sha256": "6147b985066daa2302a332d647a832e43809c6d23d76271d236e4b27cd84c15c"
     },
     {
       "path": "docs/TESTING_AND_RELEASE_GATES.md",
@@ -160,7 +168,7 @@
     },
     {
       "path": "docs/assets/stylesheets/microsoft-inspired.css",
-      "sha256": "30ba9e6d4fe0cbbde1fa4438f2e353d63e900dc6289eba798884da09e038e318"
+      "sha256": "8d584fbbde02488944280e6efb903fa7d26636a7dc750f60908ec8bab1227b11"
     },
     {
       "path": "docs/contracts/agent-runtime.md",
@@ -356,35 +364,35 @@
     },
     {
       "path": "docs/design/teams/api-ui.md",
-      "sha256": "de8b068a4958520a3d2efb515a0c243562dcd2762803083dbb5531aa387cd1f0"
+      "sha256": "b08e9f4b8037b695d2be1d8313c4b351bd3e523e67ba3fa32f93269bb214a4da"
     },
     {
       "path": "docs/design/teams/broker-connectivity.md",
-      "sha256": "d78f26da751b17bedb9027d37a38a532c5017a1c30a38657eb5f103b032bed8c"
+      "sha256": "03291353e1f1191e1cbba96e976ff7d2cc05e06756cafc3da60bbd5034f61385"
     },
     {
       "path": "docs/design/teams/data-platform.md",
-      "sha256": "55867658ef63bb5e16a2986412be8bea90bab0cc410df016d1363cb604b66f93"
+      "sha256": "ffed9e72885f0450f572a9f752470e0a7d645481d6c6301a490643c7c4eec21b"
     },
     {
       "path": "docs/design/teams/platform-devex.md",
-      "sha256": "4f90a9c311c7a117cb1efa0da13d0906795ca3f6e80692551cb846d4680d7506"
+      "sha256": "69c38100c28c37042b0e9652b30a0fee97c1a92c72e51aa71a64718fa1f1c96f"
     },
     {
       "path": "docs/design/teams/policy-platform.md",
-      "sha256": "c88114597a2a4288b127a14383c6b399ab19f6b16fdb0bdd45640d17fbce3bc1"
+      "sha256": "c4780aeaa8ff1c307ea6e56326a9ac78d7058d09f30d6e13a26359e3ab0434e5"
     },
     {
       "path": "docs/design/teams/qa-release.md",
-      "sha256": "4ca5b56c26a261e69a26e92f100fab36921105b8d8020e116e617c8888b1935d"
+      "sha256": "a1d0f027756a8ce06ba344a952ee1f7e98b71d7b9a451574ed3814dd62d7419f"
     },
     {
       "path": "docs/design/teams/sre.md",
-      "sha256": "57e4371090948a99a969d1a610d963d1c719331cba751e6d5bab1f4155741479"
+      "sha256": "45dd1dcb0fc6d8c3dde5e7cbc8ea5ff71927f6c923f113e869124cca995731ef"
     },
     {
       "path": "docs/design/teams/trading-core.md",
-      "sha256": "ca103f69fa8f1817a9ce0360ef97dbd66c61bc1d06cf2347dec5f13befaa80b5"
+      "sha256": "8cbe984d527598efce433c3a84b6cc982207a582572f5f0dfcae411f19f12860"
     },
     {
       "path": "docs/design/templates/design-review-template.md",
@@ -400,11 +408,23 @@
     },
     {
       "path": "docs/index.md",
-      "sha256": "3e675a7a9e6a99a7148e754b5451d89fb84077574bada421f41f5237ca53e454"
+      "sha256": "452e04b814ed275de6557f18ae573db073484b3dd7fd35a1b87a90e46773fd9e"
+    },
+    {
+      "path": "docs/runbooks/github-pm-click-path.md",
+      "sha256": "1c8fdc21db724072a32555a38b97b06e5fd8354ddf1de667c8133ec1b8093d1f"
     },
     {
       "path": "docs/runbooks/plan-sync-ops.md",
-      "sha256": "756cb8e031a9a4ccffe3903914089b352c7ac1a365b50e791b8475f8a45292bd"
+      "sha256": "be8a8c5bc28c6b919b82a572939239774b1c73dc89ae4c6fcc14c04fe20b397c"
+    },
+    {
+      "path": "docs/runbooks/pm-agent-operations.md",
+      "sha256": "c6884a5dde4ebf1c1cfe11dfb4fa97b83f13d7e7859e6e0252f740fc2b754bf9"
+    },
+    {
+      "path": "docs/runbooks/pm-dashboard-checklist.md",
+      "sha256": "e70ce313de79adda6b8ce377390d0df4c9c9998855cfb415c6c9d901a2db5a95"
     },
     {
       "path": "docs/runbooks/trading-ops.md",
@@ -432,7 +452,7 @@
     },
     {
       "path": "docs/source-of-truth/06-team-implementation-plan.md",
-      "sha256": "d9a1b948f8115978943d4a8148155b9c1b58e8d079f5cbd2ea19bca8c676666b"
+      "sha256": "687667c8f1e15b28da2630cdd66d9de7f9649ca87317ec9e2e9042a6c0118630"
     },
     {
       "path": "docs/source-of-truth/07-traceability-acceptance-matrix.md",
@@ -448,11 +468,11 @@
     },
     {
       "path": "docs/tasks.schema.json",
-      "sha256": "5951f767192ab5e5a40758a07c8ca9de7c649f2d76e789a339166c3bb7617408"
+      "sha256": "b14807d42327b6492c546575091724d4a5ebd9e4ee025d36c0c10f624a58e527"
     },
     {
       "path": "docs/tasks.yaml",
-      "sha256": "95825421ddb59f90bd60a81b608240eafaa94c5071978c2cba6528e7d5a4b068"
+      "sha256": "f566069ba6710e11589af85bdb7a43f3254d5aa5f82fa06a974769187d54dca9"
     }
   ]
 }

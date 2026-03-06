@@ -1,0 +1,29 @@
+name: pr-governance
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch naming and issue link
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          echo "head_ref=${HEAD_REF}"
+          if ! echo "$HEAD_REF" | grep -Eq '^codex/.+-[0-9]+-.+'; then
+            echo "Branch name must match codex/<repo>-<issue>-<short-topic>"
+            exit 1
+          fi
+
+          if ! echo "${PR_BODY:-}" | grep -Eq '(Closes|Fixes|Resolves) #[0-9]+'; then
+            echo "PR body must include an issue link like: Closes #123"
+            exit 1
+          fi

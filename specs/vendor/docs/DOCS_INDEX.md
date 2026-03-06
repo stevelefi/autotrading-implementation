@@ -22,6 +22,7 @@ This folder contains the full project documentation for the broker-integrated tr
 - [Rule Engine (OPA)](./RULE_ENGINE_OPA.md)
 - [Instruments and Markets (Stocks + MNQ)](./INSTRUMENTS_AND_MARKETS.md)
 - [Production Plan (Detailed)](./PRODUCTION_PLAN.md)
+- [Team Roles and Responsibilities (Canonical)](./TEAM_ROLES_AND_RESPONSIBILITIES.md)
 
 ## Technical Specs
 - [Database Schema](./DATABASE_SCHEMA.md)
@@ -46,10 +47,15 @@ This folder contains the full project documentation for the broker-integrated tr
 - [Implementation Roadmap](./IMPLEMENTATION_ROADMAP.md)
 - [Implementation Phases and Team Plan](./IMPLEMENTATION_PHASES.md)
 - [Deliverables and Milestones Plan](./DELIVERABLES_AND_MILESTONES.md)
+- [4-Day Solo + AI DevOps Blitz Playbook](./DEVOPS_BLITZ_4_DAY_PLAYBOOK.md)
+- [Team Roles and Responsibilities (Canonical)](./TEAM_ROLES_AND_RESPONSIBILITIES.md)
 - [Spec Baseline Tagging and Multi-Agent Handoff](./SPEC_BASELINE_HANDOFF.md)
 - [Task Tracking Guide](./TASK_TRACKING_GUIDE.md)
-- [Automation Plan (GitHub/Java/Excel)](./IMPLEMENTATION_PLAN.md)
+- [Automation Plan (GitHub/Python/Excel)](./IMPLEMENTATION_PLAN.md)
 - [Plan Sync Ops Runbook](./runbooks/plan-sync-ops.md)
+- [PM Agent Operations Runbook](./runbooks/pm-agent-operations.md)
+- [GitHub PM Click Path](./runbooks/github-pm-click-path.md)
+- [PM Dashboard Checklist](./runbooks/pm-dashboard-checklist.md)
 - [Trading Ops Runbook](./runbooks/trading-ops.md)
 
 ## Current Defaults

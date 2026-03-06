@@ -106,7 +106,7 @@ Canonical names used in this repo:
 | Kafka contract lifecycle | Data Platform | Trading Core |
 | Operator API and dashboard UX | API/UI | SRE |
 | Observability and incident readiness | SRE | API/UI |
-| Task traceability automation | Platform/DevEx | QA/Release |
+| Task traceability automation | Platform DevEx | QA/Release |
 
 ## Handoff Checklist For Any Component Change
 1. Update responsibilities and ownership in this document.

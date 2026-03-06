@@ -1,26 +1,30 @@
-# API and UI Team Guide
+# API/UI Team Guide
 
 ## Scope
-Owns ingress boundary APIs, operator control/query APIs, SSE event stream, dashboard UI, and workflow UX for incident/reconciliation operations.
+Owns ingress-facing contracts and operator monitoring/control workflows.
 
-## Owned Components
-- `ingress-gateway-service`
-- `monitoring-api`
-- `dashboard-ui`
+## Owned Components/Repos
+- Components: `ingress-gateway-service`, `monitoring-api`, dashboard UI flows
+- Repos: `autotrading-implementation`
 
-## Required Screens
-- System health and trading mode
-- Agent performance and orders
-- Risk events timeline
-- Reconciliation status and resume action
+## Core Responsibilities
+- Maintain ingress and monitoring API contract behavior.
+- Maintain SSE/dashboard flows for frozen, unknown, and reconcile states.
+- Ensure operator actions are auditable and role-constrained.
+- Ensure legacy intake paths forward to ingress controls.
 
-## API Requirements
-- Every response includes `trace_id`.
-- Mutating endpoints require actor metadata.
-- Consistent error envelopes across endpoints.
-- Legacy intake endpoints in `monitoring-api` must forward to ingress and not bypass ingress controls.
+## Non-Negotiables
+- Mutating controls require actor metadata and audit traceability.
+- Frozen and unknown state visibility must be explicit in UI and API responses.
+- API contract changes require synchronized docs/contract updates.
 
-## UX Requirements
-- Frozen mode must be visually prominent.
-- Unknown order states must be highlighted.
-- Operator actions require confirmation and logging.
+## Handoffs
+- Inbound from Trading Core and Policy Platform: lifecycle/risk event contracts.
+- Inbound from SRE: operational status and incident signal requirements.
+- Outbound to Program Lead and QA/Release: operator readiness evidence.
+
+## Acceptance Signals
+- Contract validation and endpoint parity checks pass.
+- Operator UAT scenarios for freeze/reconcile actions pass.
+- UI/API outputs include required trace and explainability fields.
+

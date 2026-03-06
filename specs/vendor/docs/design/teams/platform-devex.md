@@ -1,19 +1,30 @@
 # Platform DevEx Team Guide
 
 ## Scope
-Owns CI/CD workflows, plan-sync automation tooling, task governance enforcement, and developer productivity guardrails.
+Owns developer workflow automation, spec governance tooling, and planning system reliability.
 
-## Owned Components
-- `.github/workflows/*plan*`
-- `tools/plan-sync`
-- task schema validation and policy checks
+## Owned Components/Repos
+- Components: plan-sync automation, docs build/release workflows, spec drift verification
+- Repos: `autotrading`, `autotrading-devops`
 
-## Non-Negotiable Rules
-- `docs/tasks.yaml` is machine source of truth.
-- PRs must pass plan validation checks.
-- No task deletion in ledger; deprecate instead.
+## Core Responsibilities
+- Maintain task governance automation and validation policies.
+- Maintain spec pinning and drift detection controls across implementation repos.
+- Maintain docs site pipeline health and documentation quality gates.
+- Maintain developer enablement tooling for repeatable workflows.
 
-## Outputs
-- Reliable issue/project sync.
-- Daily Excel exports for stakeholders.
-- Runbooks for sync failure and retries.
+## Non-Negotiables
+- `docs/tasks.yaml` remains canonical for planning automation.
+- Implementation repos must verify pinned spec snapshots.
+- No task deletion; deprecated workflow only.
+
+## Handoffs
+- Inbound from Program Lead: planning priorities and governance constraints.
+- Inbound from SRE and QA/Release: release-gate automation requirements.
+- Outbound to all teams: automation tooling, CI guardrails, and governance runbooks.
+
+## Acceptance Signals
+- plan-sync validate/sync/summary workflows run reliably.
+- spec drift checks remain green across consumer repos.
+- docs pipeline builds pass strict mode consistently.
+

@@ -1,24 +1,30 @@
 # Data Platform Team Guide
 
 ## Scope
-Owns database design, migrations, event persistence patterns, data quality, and performance read models.
+Owns durable data consistency patterns across schema, persistence, and event reliability paths.
 
-## Owned Areas
-- Postgres schema and Flyway migrations
-- Kafka topic governance
-- Outbox/inbox frameworks
-- Position/PnL derivation support
+## Owned Components/Repos
+- Components: Postgres schema and migrations, outbox/inbox reliability model, topic/key governance
+- Repos: `autotrading-implementation`
 
-## Critical Constraints
-- Unique idempotency keys and execution keys.
-- Strong indexes for ledger and deadline scans.
-- Zero destructive migration during trading hours.
+## Core Responsibilities
+- Maintain schema evolution and migration safety.
+- Enforce idempotency keys, dedupe indexes, and replay-safe constraints.
+- Own outbox/inbox contract integrity and recovery patterns.
+- Support replay/rebuild and reconciliation data correctness.
 
-## Data Quality Responsibilities
-- Schema validation in CI.
-- Backfill/replay tooling design.
-- Reconciliation diff data quality checks.
+## Non-Negotiables
+- No destructive schema changes during active trading windows.
+- Outbox append and domain mutations must share transactional boundaries.
+- Replay must not produce duplicate effective side effects.
 
-## Recovery Responsibilities
-- Backup/restore testing.
-- Replay verification procedures.
+## Handoffs
+- Inbound from Trading Core and Broker Connectivity: event and state mutation requirements.
+- Inbound from SRE: operational limits and recovery requirements.
+- Outbound to API/UI and QA/Release: reliable projection and certification data.
+
+## Acceptance Signals
+- Migration apply checks pass in CI.
+- Replay and restore drills complete without unexplained drift.
+- Outbox/inbox duplicate suppression metrics remain within thresholds.
+
