@@ -185,10 +185,19 @@ python3 scripts/trace.py --agent-id agent-alpha --service risk-service
 - `autotrading_reliability_first_status_timeout_count`
 
 **Structured log fields** (all 8 services, usable as Loki filters):
-```
-trace_id  request_id  idempotency_key  principal_id
-agent_id  signal_id   order_intent_id  instrument_id
-```
+
+| Field | What it identifies |
+|---|---|
+| `trace_id` | One end-to-end request through the full stack (per-attempt, OTel auto-generated) |
+| `request_id` | Originating `X-Request-Id` header or Kafka event ID |
+| `idempotency_key` | Caller-supplied dedup key — shared across retries of the same business request |
+| `principal_id` | Actor who originated the trade (`X-Actor-Id` header) |
+| `agent_id` | Trading agent driving this signal/order |
+| `signal_id` | Links agent-runtime logs → risk-service logs for one decision |
+| `order_intent_id` | Links risk → order-service → ibkr-connector logs for one order |
+| `instrument_id` | Traded symbol — filters all activity on one symbol across services |
+
+See [docs/OBSERVABILITY.md § 7](docs/OBSERVABILITY.md) for the join-chain diagram, `trace_id` vs `idempotency_key` explanation, and common troubleshooting workflows.
 
 ---
 
