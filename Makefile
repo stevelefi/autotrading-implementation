@@ -1,53 +1,46 @@
 SHELL := /bin/bash
+STACK := python3 scripts/stack.py
 
-COMPOSE := docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml
+.PHONY: up up-infra up-app down down-infra restart restart-app build status logs validate ci-local \
+        test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec \
+        helm-lint helm-template pre-commit
 
-.PHONY: up up-infra up-app down down-infra logs build restart validate ci-local test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template pre-commit
-
-APP_SERVICES := ingress-gateway-service event-processor-service agent-runtime-service risk-service order-service ibkr-connector-service performance-service monitoring-api
+# ── Docker orchestration (delegates to scripts/stack.py) ─────────────────────
 
 build:
-	$(COMPOSE) build
-
-restart: down build up
+	$(STACK) build
 
 up:
-	$(COMPOSE) up -d --remove-orphans
+	$(STACK) up
 
 up-infra:
-	$(COMPOSE) up -d --remove-orphans postgres redpanda redpanda-console otel-collector prometheus loki promtail grafana ibkr-simulator
+	$(STACK) infra-up
 
 up-app:
-	$(COMPOSE) up -d --remove-orphans $(APP_SERVICES)
-
-validate:
-	@echo "=== Container status ==="
-	$(COMPOSE) ps
-	@echo ""
-	@echo "=== Running smoke suite ==="
-	$(MAKE) smoke-local
-
-ci-local:
-	@STATUS=0; \
-	$(MAKE) build down-infra up || STATUS=$$?; \
-	if [ $$STATUS -eq 0 ]; then $(MAKE) validate || STATUS=$$?; fi; \
-	if [ $$STATUS -ne 0 ]; then \
-		echo ""; \
-		echo "=== ci-local FAILED (exit $$STATUS) — last 40 log lines per service ==="; \
-		$(COMPOSE) logs --tail=40 2>&1; \
-	fi; \
-	$(MAKE) down; \
-	exit $$STATUS
+	$(STACK) app-up
 
 down:
-	$(COMPOSE) stop $(APP_SERVICES)
-	$(COMPOSE) rm -f $(APP_SERVICES)
+	$(STACK) app-down
 
 down-infra:
-	$(COMPOSE) down -v
+	$(STACK) down
+
+restart: down-infra build up
+
+restart-app:
+	$(STACK) restart-app
+
+status:
+	$(STACK) status
 
 logs:
-	$(COMPOSE) logs -f --tail=200
+	$(STACK) logs
+
+validate:
+	$(STACK) validate
+
+ci-local:
+	$(STACK) ci
 
 test-unit:
 	mvn -B -DskipITs=true test
@@ -62,8 +55,8 @@ smoke-local:
 	python3 scripts/smoke_local.py
 
 rollback-local:
-	@echo "Rollback primitive: stopping local services and preserving DB volume snapshot strategy"
-	$(COMPOSE) stop
+	@echo "Rollback primitive: stopping app services (infra volumes preserved)"
+	$(STACK) app-down
 
 verify-spec:
 	python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
