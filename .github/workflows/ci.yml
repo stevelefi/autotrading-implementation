@@ -32,7 +32,12 @@ jobs:
         run: mvn -B -pl tests/e2e -am -Dtest=VerticalSliceGrpcFlowTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Sync + verify pinned spec snapshot
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
           python3 - <<'PY'
           import json
           import subprocess
