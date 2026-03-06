@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: up down logs test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template
+.PHONY: up down logs test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template pre-commit
 
 up:
 	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml up -d --remove-orphans
@@ -35,3 +35,7 @@ helm-lint:
 
 helm-template:
 	helm template trading-service infra/helm/charts/trading-service -f infra/helm/charts/trading-service/values.yaml
+
+pre-commit: test-unit test-coverage-core verify-spec helm-lint helm-template
+	@echo "All local checks passed."
+
