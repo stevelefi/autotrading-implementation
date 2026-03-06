@@ -1,35 +1,30 @@
 # Policy Platform Team Guide
 
 ## Scope
-Owns OPA policy packages, bundle publishing, policy governance, and runtime policy observability.
+Owns OPA policy lifecycle, governance controls, and risk-policy explainability contracts.
 
-## Owned Components
-- OPA bundle repo and CI
-- policy validation tests
-- policy deployment and rollback
-- bundle signing and signature verification controls
-- policy decision audit contract stewardship
+## Owned Components/Repos
+- Components: OPA sidecar policy path, policy bundle pipeline, decision audit schema
+- Repos: `autotrading-policy`, `autotrading` (contracts and source-of-truth docs)
 
-## Policy Areas
-- Instrument whitelist
-- Time window controls
-- Quantity and exposure limits
-- Daily loss and trade frequency controls
-- Kill switch and trading mode checks
+## Core Responsibilities
+- Author and test policy bundles with versioned promotion controls.
+- Enforce signature validation and approved bundle activation flow.
+- Maintain input/output schema compatibility with Trading Core.
+- Maintain deny reason taxonomy and decision explainability fields.
 
-## Governance Rules
-- Every policy change must include test case updates.
-- Every bundle gets immutable version tag.
-- Rollback path must be pre-verified.
-- Production activation requires explicit approval.
-- Production activation requires valid signature verification.
+## Non-Negotiables
+- OPA decision path remains fail-closed for opening-order checks.
+- Unsigned or invalid bundles cannot be promoted.
+- Every policy change includes corresponding regression vectors.
 
-## Failure Behavior
-- OPA unavailable => fail-closed (reject openings).
-- Bundle load failure => last-known-good bundle and alert.
-- Schema mismatch (`opa.policy.input.v1` or `opa.policy.decision.v1`) => fail-closed deny and alert.
+## Handoffs
+- Inbound from Trading Core: risk input contract and runtime decision context.
+- Inbound from QA/Release: gate and certification evidence requirements.
+- Outbound to Trading Core and API/UI: policy decisions, reason codes, policy version metadata.
 
-## Team Outputs
-- Stable policy decision contract for risk-service.
-- Decision logs with policy version markers.
-- Reason-code taxonomy aligned across risk-service, monitoring, and audit streams.
+## Acceptance Signals
+- Bundle promotion and rollback drills pass in paper environment.
+- Schema contract checks pass for `opa.policy.input.v1` and `opa.policy.decision.v1`.
+- Decision audit events include policy version and deterministic deny reasons.
+

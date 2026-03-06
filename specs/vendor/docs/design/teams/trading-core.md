@@ -1,38 +1,30 @@
 # Trading Core Team Guide
 
 ## Scope
-Owns strategy signal lifecycle, risk integration, order state transitions, timeout handling, and freeze controls.
+Owns deterministic trade lifecycle behavior from routed signal to order lifecycle outcomes.
 
-## Owned Services
-- `event-processor-service`
-- `agent-runtime-service`
-- `risk-service` integration logic
-- `order-service`
+## Owned Components/Repos
+- Components: `event-processor-service`, `agent-runtime-service`, `risk-service` integration path, `order-service`
+- Repos: `autotrading-implementation`
 
-## Interfaces
-- Inbound: normalized ingress events and strategy signals
-- Outbound: routed trade events, order intents, risk events to monitoring
+## Core Responsibilities
+- Maintain legal order state transitions and lifecycle invariants.
+- Enforce command-path idempotency and replay-safe behavior.
+- Enforce timeout, freeze, and reconciliation control points.
+- Produce reliable command-path contracts for dependent teams.
 
-## Key Deliverables
-1. Deterministic order state machine implementation.
-2. 60-second timeout watchdog.
-3. Freeze mode gate in opening order paths.
-4. Reconciliation initiation hooks.
+## Non-Negotiables
+- Unknown order state must trigger freeze controls.
+- Command retries must not duplicate effective intent/submit behavior.
+- Contract changes must be reflected in canonical docs before rollout.
 
-## Non-Negotiable Checks
-- Every signal must include idempotency key.
-- Unknown state must trigger frozen mode.
-- Done tickets require test evidence link.
+## Handoffs
+- Inbound from Policy Platform: policy decision contract and reason codes.
+- Inbound from Broker Connectivity: normalized status/fill callback contracts.
+- Outbound to API/UI and SRE: lifecycle events, alerts, and reconciliation hooks.
 
-## Testing Responsibilities
-- Unit tests for transition guards.
-- Integration tests for timeout/freeze behavior.
-- Chaos scenarios for missing callbacks.
+## Acceptance Signals
+- Timeout/freeze/reconciliation scenarios pass end-to-end.
+- No duplicate effective order intents in retry tests.
+- Milestone evidence links are attached for DONE tasks.
 
-## Handoff Inputs
-- Policy decisions from OPA contract.
-- Connector callback contract and dedupe semantics.
-
-## Handoff Outputs
-- Order ledger updates.
-- Structured risk and system alerts.

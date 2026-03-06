@@ -3,22 +3,22 @@ tasks:
   - task_id: ATP-A01
     title: Create docs/tasks.yaml schema and migrate implementation tasks
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
-    service: tools/plan-sync
+    owner_team: Platform DevEx
+    service: tools/plan_sync
     status: DONE
     risk_tier: P1
     acceptance_criteria:
       - docs/tasks.schema.json exists and validates mandatory fields
-      - docs/tasks.yaml includes ATP-A01 through ATP-A08
+      - docs/tasks.yaml includes ATP-A01 through ATP-A09
     evidence_url: https://example.com/evidence/ATP-A01
     release_tag: v0.1.0
     labels: [automation, plan-sync]
 
   - task_id: ATP-A02
-    title: Build Java CLI validate command
+    title: Build Python CLI validate command
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
-    service: tools/plan-sync
+    owner_team: Platform DevEx
+    service: tools/plan_sync
     status: DONE
     risk_tier: P1
     acceptance_criteria:
@@ -30,10 +30,10 @@ tasks:
     labels: [automation, validation]
 
   - task_id: ATP-A03
-    title: Build Java CLI sync-github command
+    title: Build Python CLI sync-github command
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
-    service: tools/plan-sync
+    owner_team: Platform DevEx
+    service: tools/plan_sync
     status: READY
     risk_tier: P1
     acceptance_criteria:
@@ -47,7 +47,7 @@ tasks:
   - task_id: ATP-A04
     title: Add PR validation workflow
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
+    owner_team: Platform DevEx
     service: .github/workflows
     status: READY
     risk_tier: P2
@@ -62,7 +62,7 @@ tasks:
   - task_id: ATP-A05
     title: Add merge sync workflow
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
+    owner_team: Platform DevEx
     service: .github/workflows
     status: READY
     risk_tier: P2
@@ -75,10 +75,10 @@ tasks:
     labels: [github-actions, automation]
 
   - task_id: ATP-A06
-    title: Build Java CLI export-excel command
+    title: Build Python CLI export-excel command
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
-    service: tools/plan-sync
+    owner_team: Platform DevEx
+    service: tools/plan_sync
     status: READY
     risk_tier: P2
     acceptance_criteria:
@@ -92,7 +92,7 @@ tasks:
   - task_id: ATP-A07
     title: Add scheduled Excel export workflow
     epic: EPIC-AUTOMATION
-    owner_team: Platform-DevEx
+    owner_team: Platform DevEx
     service: .github/workflows
     status: BACKLOG
     risk_tier: P3
@@ -107,7 +107,7 @@ tasks:
   - task_id: ATP-A08
     title: Write runbook for sync failure and recovery
     epic: EPIC-AUTOMATION
-    owner_team: QA-Release
+    owner_team: QA/Release
     service: docs/runbooks
     status: BACKLOG
     risk_tier: P2
@@ -118,3 +118,233 @@ tasks:
     evidence_url: ""
     release_tag: v0.1.0
     labels: [runbook, operations]
+
+  - task_id: ATP-B01
+    title: Create implementation monorepo skeleton for paper vertical slice
+    epic: EPIC-BLITZ-IMPLEMENTATION
+    owner_team: Platform DevEx
+    service: implementation-monorepo
+    status: READY
+    risk_tier: P1
+    acceptance_criteria:
+      - Monorepo folders follow the approved blueprint for services libs infra tests and docs
+      - Baseline build files and health endpoints compile in local workflow
+      - Skeleton is merged into integration branch for stream parallelization
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B1
+    target_date: "2026-03-06"
+    labels: [blitz, foundation, monorepo]
+
+  - task_id: ATP-B02
+    title: Bootstrap local runtime with Docker Compose and env templates
+    epic: EPIC-BLITZ-IMPLEMENTATION
+    owner_team: Platform DevEx
+    service: infra/local
+    status: READY
+    risk_tier: P1
+    acceptance_criteria:
+      - Compose stack includes postgres kafka ibkr-sim and vertical-slice services
+      - Env template files are committed and .env.local remains gitignored
+      - make up and make down run successfully on clean clone
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B1
+    blocked_by: [ATP-B01]
+    target_date: "2026-03-06"
+    labels: [blitz, compose, devops]
+
+  - task_id: ATP-B03
+    title: Add CI baseline gates for unit migration and compose smoke checks
+    epic: EPIC-BLITZ-IMPLEMENTATION
+    owner_team: Platform DevEx
+    service: .github/workflows
+    status: BACKLOG
+    risk_tier: P1
+    acceptance_criteria:
+      - CI runs compile and unit test jobs for all enabled modules
+      - Migration apply test fails pipeline on schema regressions
+      - Compose smoke test verifies one synthetic ingress event path
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B1
+    blocked_by: [ATP-B01, ATP-B02]
+    target_date: "2026-03-06"
+    labels: [blitz, ci, devops]
+
+  - task_id: ATP-B04
+    title: Implement reliability-core common-envelope interfaces
+    epic: EPIC-BLITZ-RELIABILITY
+    owner_team: Trading Core
+    service: libs/reliability-core
+    status: BACKLOG
+    risk_tier: P1
+    acceptance_criteria:
+      - Shared envelope includes trace_id request_id idempotency_key and principal_id
+      - Public interfaces are documented and stable for day-1 consumers
+      - Envelope propagation test covers ingress to order path
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B2
+    blocked_by: [ATP-B01]
+    target_date: "2026-03-07"
+    labels: [blitz, reliability-core, envelope]
+
+  - task_id: ATP-B05
+    title: Implement idempotency claim complete fail semantics in ingress and order
+    epic: EPIC-BLITZ-RELIABILITY
+    owner_team: Trading Core
+    service: libs/reliability-core
+    status: BACKLOG
+    risk_tier: P0
+    acceptance_criteria:
+      - Same key and same payload returns replayed acceptance metadata
+      - Same key and different payload is rejected as conflict
+      - idempotency_records migration and indexes are validated in CI
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B2
+    blocked_by: [ATP-B04]
+    target_date: "2026-03-07"
+    labels: [blitz, reliability-core, idempotency]
+
+  - task_id: ATP-B06
+    title: Implement outbox/inbox transactional publish and consumer dedupe
+    epic: EPIC-BLITZ-RELIABILITY
+    owner_team: Data Platform
+    service: libs/reliability-core
+    status: BACKLOG
+    risk_tier: P0
+    acceptance_criteria:
+      - Domain state and outbox append occur in same transaction
+      - Dispatcher publishes and marks outbox rows with retry-safe behavior
+      - consumer_inbox dedupe prevents duplicate side effects on replay
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B2
+    blocked_by: [ATP-B04]
+    target_date: "2026-03-07"
+    labels: [blitz, reliability-core, outbox-inbox]
+
+  - task_id: ATP-B07
+    title: Wire gRPC command chain risk to order to broker simulator
+    epic: EPIC-BLITZ-COMMAND-PATH
+    owner_team: Trading Core
+    service: services/risk-order-broker
+    status: BACKLOG
+    risk_tier: P0
+    acceptance_criteria:
+      - EvaluateSignal CreateOrderIntent and SubmitOrder are callable in sequence
+      - Metadata includes trace_id x-request-id idempotency_key and principal identity
+      - gRPC retry with same key does not duplicate effective broker submit
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B3
+    blocked_by: [ATP-B05, ATP-B06]
+    target_date: "2026-03-08"
+    labels: [blitz, grpc, command-path]
+
+  - task_id: ATP-B08
+    title: Enforce 60s first-status timeout unknown state and freeze controls
+    epic: EPIC-BLITZ-COMMAND-PATH
+    owner_team: Trading Core
+    service: services/order-service
+    status: BACKLOG
+    risk_tier: P0
+    acceptance_criteria:
+      - Missing first broker status within 60s transitions order to UNKNOWN_PENDING_RECON
+      - Freeze mode blocks opening orders until reconciliation and operator ack
+      - Timeout scenario emits alert event for monitoring consumption
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B3
+    blocked_by: [ATP-B07]
+    target_date: "2026-03-08"
+    labels: [blitz, safety, freeze]
+
+  - task_id: ATP-B09
+    title: Add Helm baseline chart and validation workflow
+    epic: EPIC-BLITZ-DEVOPS
+    owner_team: Platform DevEx
+    service: infra/helm
+    status: BACKLOG
+    risk_tier: P2
+    acceptance_criteria:
+      - Service chart template supports paper profile values per service
+      - CI runs helm lint and helm template checks
+      - Chart render outputs include config and secret references only
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B3
+    blocked_by: [ATP-B02]
+    target_date: "2026-03-08"
+    labels: [blitz, helm, devops]
+
+  - task_id: ATP-B10
+    title: Execute reliability drills for outage restart and callback replay
+    epic: EPIC-BLITZ-HARDENING
+    owner_team: SRE
+    service: tests/e2e
+    status: BACKLOG
+    risk_tier: P1
+    acceptance_criteria:
+      - Kafka outage and recovery drill shows backlog drain with no data loss
+      - Restart with pending outbox preserves transactional consistency
+      - Duplicate callback replay does not create duplicate state transitions
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B4
+    blocked_by: [ATP-B08, ATP-B09]
+    target_date: "2026-03-09"
+    labels: [blitz, reliability, drills]
+
+  - task_id: ATP-B11
+    title: Add minimum observability metrics for reliability controls
+    epic: EPIC-BLITZ-HARDENING
+    owner_team: SRE
+    service: observability
+    status: BACKLOG
+    risk_tier: P1
+    acceptance_criteria:
+      - Metrics include outbox backlog age duplicate suppression count and first-status timeout count
+      - Metrics are queryable from monitoring API or scrape endpoint
+      - Threshold guidance is documented for alert setup
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B4
+    blocked_by: [ATP-B08]
+    target_date: "2026-03-09"
+    labels: [blitz, observability, sre]
+
+  - task_id: ATP-B12
+    title: Produce evidence pack and tag paper-slice implementation checkpoint
+    epic: EPIC-BLITZ-HARDENING
+    owner_team: QA/Release
+    service: reports/blitz
+    status: BACKLOG
+    risk_tier: P1
+    acceptance_criteria:
+      - Evidence pack contains day1 through day4 reports e2e results drill logs and known risks
+      - Repro steps from clean clone are documented and validated once
+      - Checkpoint tag impl-v0.1.0-paper-slice is created after gates pass
+    evidence_url: ""
+    release_tag: impl-v0.1.0-paper-slice
+    milestone: B4
+    blocked_by: [ATP-B10, ATP-B11]
+    target_date: "2026-03-09"
+    labels: [blitz, evidence, release]
+  - task_id: ATP-A09
+    title: Run quarterly RACI review and canonical naming audit
+    epic: EPIC-GOVERNANCE
+    owner_team: Platform DevEx
+    service: docs/TEAM_ROLES_AND_RESPONSIBILITIES.md
+    status: BACKLOG
+    risk_tier: P2
+    acceptance_criteria:
+      - Canonical team matrix reviewed and refreshed each quarter
+      - Team naming drift check passes for production plan team guides and tasks
+      - Any ownership changes are linked to approved governance notes
+    evidence_url: ""
+    release_tag: v0.1.1
+    milestone: M1
+    labels: [governance, docs, raci]

@@ -8,6 +8,8 @@
   --md-primary-fg-color: #1a73e8;
   --md-primary-fg-color--light: #4285f4;
   --md-primary-fg-color--dark: #0b57d0;
+  --md-primary-bg-color: #202124;
+  --md-primary-bg-color--light: #3c4043;
   --md-accent-fg-color: #1a73e8;
   --md-typeset-a-color: #1a73e8;
   --docs-border: rgba(60, 64, 67, 0.2);
@@ -26,6 +28,8 @@
   --md-primary-fg-color: #2f2f31;
   --md-primary-fg-color--light: #4a4a4d;
   --md-primary-fg-color--dark: #1d1d1f;
+  --md-primary-bg-color: #1d1d1f;
+  --md-primary-bg-color--light: #424245;
   --md-accent-fg-color: #0071e3;
   --md-typeset-a-color: #0071e3;
   --docs-border: rgba(29, 29, 31, 0.12);
@@ -54,6 +58,23 @@
   background: var(--docs-header-bg);
   border-bottom: 1px solid var(--docs-border);
   backdrop-filter: saturate(130%) blur(12px);
+  color: var(--md-default-fg-color);
+}
+
+.md-header__button,
+.md-header__title,
+.md-header__topic,
+.md-header__source {
+  color: var(--md-default-fg-color);
+}
+
+.md-header__button .md-icon svg {
+  fill: currentcolor;
+}
+
+.md-header__button[for="__drawer"] {
+  opacity: 1;
+  visibility: visible;
 }
 
 .md-tabs {
@@ -132,6 +153,34 @@
 }
 
 @media (max-width: 960px) {
+  .md-header__button[for="__drawer"] {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin-inline-end: 0.2rem;
+    border-radius: 999px;
+    color: var(--md-default-fg-color) !important;
+    pointer-events: auto;
+    z-index: 5;
+  }
+
+  .md-header__button[for="__drawer"] .md-icon svg {
+    width: 1.3rem;
+    height: 1.3rem;
+    fill: currentcolor !important;
+    stroke: currentcolor;
+  }
+
+  .md-header__title {
+    min-width: 0;
+  }
+
+  .md-sidebar--primary {
+    width: min(86vw, 22rem);
+  }
+
   .md-content__inner {
     padding: 1rem 0.85rem;
   }
@@ -180,6 +229,10 @@
 }
 
 @media (max-width: 640px) {
+  .md-header {
+    padding-top: env(safe-area-inset-top);
+  }
+
   .md-content__inner {
     border-radius: 10px;
     padding: 0.85rem 0.72rem;
@@ -227,6 +280,15 @@
 }
 
 @media (max-width: 420px) {
+  .md-header__button[for="__drawer"] {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+
+  .md-sidebar--primary {
+    width: 90vw;
+  }
+
   .md-nav--primary .md-nav__title {
     font-size: 0.86rem;
     padding: 0.75rem 0.85rem;

@@ -2,6 +2,17 @@
 
 ## Planning Structure
 Work is split by execution streams with clear owners and exit criteria.
+Canonical team ownership matrix: [Team Roles and Responsibilities (Canonical)](../TEAM_ROLES_AND_RESPONSIBILITIES.md)
+
+## 4-Day Blitz Overlay (Solo + AI)
+When running the compressed paper-slice sprint, use this stream map:
+1. Stream A: service contracts and envelope propagation.
+2. Stream B: idempotency and migrations.
+3. Stream C: outbox/inbox workers and consumer dedupe.
+4. Stream D: DevOps track (compose, helm, CI, e2e, evidence).
+5. Human owner: final merge and release gate approval.
+
+Reference: [4-Day Solo + AI DevOps Blitz Playbook](../DEVOPS_BLITZ_4_DAY_PLAYBOOK.md)
 
 ## Stream A: Trading Core
 ### Tasks

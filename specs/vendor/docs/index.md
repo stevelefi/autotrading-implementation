@@ -17,12 +17,14 @@ Reference design, contracts, reliability controls, and rollout plans for broker-
 - [Kafka Event Contracts](./KAFKA_EVENT_CONTRACTS.md)
 - [Observability and Alerting](./OBSERVABILITY_AND_ALERTING.md)
 - [Testing and Release Gates](./TESTING_AND_RELEASE_GATES.md)
+- [Team Roles and Responsibilities](./TEAM_ROLES_AND_RESPONSIBILITIES.md)
+- [4-Day Solo + AI DevOps Blitz Playbook](./DEVOPS_BLITZ_4_DAY_PLAYBOOK.md)
 
 ## By Role
-- Founder / Ops: [Production Plan](./PRODUCTION_PLAN.md), [Task Tracking Guide](./TASK_TRACKING_GUIDE.md), [Trading Ops Runbook](./runbooks/trading-ops.md)
+- Founder / Ops: [Production Plan](./PRODUCTION_PLAN.md), [Team Roles and Responsibilities](./TEAM_ROLES_AND_RESPONSIBILITIES.md), [Task Tracking Guide](./TASK_TRACKING_GUIDE.md), [PM Agent Operations](./runbooks/pm-agent-operations.md), [GitHub PM Click Path](./runbooks/github-pm-click-path.md), [PM Dashboard Checklist](./runbooks/pm-dashboard-checklist.md), [Trading Ops Runbook](./runbooks/trading-ops.md)
 - Engineering: [Trading Architecture](./TRADING_ARCHITECTURE.md), [Component Interactions](./design/17-component-interactions-and-doc-plan.md), [Component Contract Matrix](./design/19-component-contract-matrix.md)
 - Risk / Policy: [Rule Engine OPA](./RULE_ENGINE_OPA.md), [Risk Service Contract](./contracts/risk-service.md), [Policy Bundle Contract](./contracts/policy-bundle-contract.md), [Policy Decision Audit Contract](./contracts/policy-decision-audit-contract.md), [Requirements](./source-of-truth/01-requirements.md)
-- SRE / QA / Release: [Deployment and Environments](./DEPLOYMENT_AND_ENVIRONMENTS.md), [Observability and Alerting](./OBSERVABILITY_AND_ALERTING.md), [Testing and Release Gates](./TESTING_AND_RELEASE_GATES.md)
+- SRE / QA / Release: [Deployment and Environments](./DEPLOYMENT_AND_ENVIRONMENTS.md), [Observability and Alerting](./OBSERVABILITY_AND_ALERTING.md), [Testing and Release Gates](./TESTING_AND_RELEASE_GATES.md), [4-Day Solo + AI DevOps Blitz Playbook](./DEVOPS_BLITZ_4_DAY_PLAYBOOK.md)
 
 ## Source Of Truth Set
 - [Requirements](./source-of-truth/01-requirements.md)

@@ -12,6 +12,20 @@ Detailed deliverable tracking is maintained in [Deliverables and Milestones Plan
 
 Reference: [Spec Baseline Tagging and Multi-Agent Handoff](./SPEC_BASELINE_HANDOFF.md)
 
+## Blitz Overlay: 4-Day Solo + AI Paper Slice
+This overlay compresses early implementation into a 4-day execution cycle while keeping the same reliability constraints.
+
+| Day | Focus | AI Stream Owners | Hard Exit Criteria |
+|---|---|---|---|
+| `B1` | Platform bootstrap | Stream D + Human | compose stack healthy, CI green for skeleton |
+| `B2` | Idempotency + outbox/inbox | Stream B + Stream C | no duplicate routed side effects, post-commit publish verified |
+| `B3` | gRPC command path + safety | Stream A + Stream D | BUY flow reaches sim fill, timeout->freeze deterministic |
+| `B4` | Hardening + evidence | All streams + Human | drill pack complete, reproducible clean-clone demo |
+
+Blitz execution details:
+1. [4-Day Solo + AI DevOps Blitz Playbook](./DEVOPS_BLITZ_4_DAY_PLAYBOOK.md)
+2. [Deliverables and Milestones Plan](./DELIVERABLES_AND_MILESTONES.md)
+
 ## Phase 0: Design Freeze and Contract Lock (Week 1)
 
 ## Objectives
@@ -38,9 +52,9 @@ Reference: [Spec Baseline Tagging and Multi-Agent Handoff](./SPEC_BASELINE_HANDO
 - Standardize docs-first local validation.
 
 ## Team Deliverables
-- Platform/DevEx:
+- Platform DevEx:
   - docs workflow for contract validation + strict MkDocs builds.
-  - plan-sync packaging and validation tooling.
+  - plan-sync Python tooling for validate/sync/export/pm-summary automation.
   - local commands documented in `docs/DEV_WORKFLOW_DOCKER.md`.
 - API/UI + Docs owners:
   - run local docs preview and fix broken links.
@@ -169,7 +183,7 @@ Reference: [Spec Baseline Tagging and Multi-Agent Handoff](./SPEC_BASELINE_HANDO
 - SRE + Trading Core:
   - limited rollout window and kill-switch rehearsal.
   - live rollback and freeze drills.
-- Product/Ops:
+- Program Lead:
   - go-live approval checklist and reporting cadence.
 
 ## Exit Criteria
