@@ -31,38 +31,38 @@ jobs:
           fi
 
           python - <<'PY'
-          import json
-          import os
-          import subprocess
+import json
+import os
+import subprocess
 
-          with open("SPEC_VERSION.json", "r", encoding="utf-8") as f:
-              v = json.load(f)
+with open("SPEC_VERSION.json", "r", encoding="utf-8") as f:
+    v = json.load(f)
 
-          repo_url = v["repo_url"]
-          if repo_url.startswith("https://github.com/"):
-              repo_url = repo_url.replace(
-                  "https://github.com/",
-                  f"https://x-access-token:{os.environ['SPEC_REPO_PAT']}@github.com/",
-                  1,
-              )
+repo_url = v["repo_url"]
+if repo_url.startswith("https://github.com/"):
+    repo_url = repo_url.replace(
+        "https://github.com/",
+        f"https://x-access-token:{os.environ['SPEC_REPO_PAT']}@github.com/",
+        1,
+    )
 
-          subprocess.run(
-              [
-                  "python",
-                  "tools/spec_sync.py",
-                  "sync",
-                  "--repo-url",
-                  repo_url,
-                  "--ref",
-                  v["ref"],
-                  "--dest",
-                  "specs/vendor",
-                  "--version-file",
-                  "SPEC_VERSION.json",
-              ],
-              check=True,
-          )
-          PY
+subprocess.run(
+    [
+        "python",
+        "tools/spec_sync.py",
+        "sync",
+        "--repo-url",
+        repo_url,
+        "--ref",
+        v["ref"],
+        "--dest",
+        "specs/vendor",
+        "--version-file",
+        "SPEC_VERSION.json",
+    ],
+    check=True,
+)
+PY
 
       - name: Verify pinned spec snapshot
         run: |
@@ -70,19 +70,20 @@ jobs:
             python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
           else
             python - <<'PY'
-            import json
+import json
 
-            with open("SPEC_VERSION.json", "r", encoding="utf-8") as f:
-                v = json.load(f)
+with open("SPEC_VERSION.json", "r", encoding="utf-8") as f:
+    v = json.load(f)
 
-            required = ["repo_url", "ref", "dest"]
-            missing = [k for k in required if not v.get(k)]
-            if missing:
-                raise SystemExit(f"spec verify failed: missing keys in SPEC_VERSION.json: {missing}")
-            if v["dest"] != "specs/vendor":
-                raise SystemExit(
-                    f"spec verify failed: expected dest=specs/vendor, found {v['dest']}"
-                )
+required = ["repo_url", "ref", "dest"]
+missing = [k for k in required if not v.get(k)]
+if missing:
+    raise SystemExit(f"spec verify failed: missing keys in SPEC_VERSION.json: {missing}")
+if v["dest"] != "specs/vendor":
+    raise SystemExit(
+        f"spec verify failed: expected dest=specs/vendor, found {v['dest']}"
+    )
 
-            print("spec verify passed (pin-only mode; no synced artifacts present in CI)")
-            PY
+print("spec verify passed (pin-only mode; no synced artifacts present in CI)")
+PY
+          fi
