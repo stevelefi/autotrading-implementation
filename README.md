@@ -159,23 +159,32 @@ python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSIO
 
 ## Observability
 
-Local endpoints after `make up`:
+Full monitoring, tracing, and runbook guide: **[docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)**
 
-| Tool | URL |
-|---|---|
-| Grafana | http://localhost:3000 |
-| Prometheus | http://localhost:9090 |
-| Loki API | http://localhost:3100 |
-| Redpanda Console | http://localhost:8888 |
-| OTel Collector gRPC | localhost:4317 |
-| OTel Collector HTTP | localhost:4318 |
+Local UIs after `make up`:
+
+| Tool | URL | Purpose |
+|---|---|---|
+| Grafana | http://localhost:3000 | Reliability dashboard, Loki log search (Explore) |
+| Prometheus | http://localhost:9090 | Ad-hoc PromQL, alert status, scrape targets |
+| Redpanda Console | http://localhost:8888 | Kafka topic browser, consumer-group lag |
+| Loki API | http://localhost:3100 | Log aggregation backend |
+| OTel Collector gRPC | localhost:4317 | Trace/log ingestion endpoint |
+| OTel Collector HTTP | localhost:4318 | Trace/log ingestion endpoint (HTTP/protobuf) |
+
+**Trace a request across all services** by `trace_id`, `idempotency_key`, or `agent_id`:
+```bash
+python3 scripts/trace.py --trace-id trc-abc-123
+python3 scripts/trace.py --idempotency-key k-abc-123 --since 30m
+python3 scripts/trace.py --agent-id agent-alpha --service risk-service
+```
 
 **Reliability metrics** (via `/actuator/prometheus` on every service):
 - `autotrading_reliability_outbox_backlog_age_ms`
 - `autotrading_reliability_duplicate_suppression_count`
 - `autotrading_reliability_first_status_timeout_count`
 
-**Structured log fields** (all 8 services):
+**Structured log fields** (all 8 services, usable as Loki filters):
 ```
 trace_id  request_id  idempotency_key  principal_id
 agent_id  signal_id   order_intent_id  instrument_id
@@ -200,6 +209,7 @@ Full schema: [db/migrations/V1__baseline.sql](db/migrations/V1__baseline.sql) ·
 
 - Implementation workflow, PR checklist, spec freeze rules: [docs/IMPLEMENTATION_INSTRUCTIONS.md](docs/IMPLEMENTATION_INSTRUCTIONS.md)
 - End-to-end data flow and design: [docs/DATA_FLOW.md](docs/DATA_FLOW.md)
+- Monitoring, tracing, and runbooks: [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md)
 - Blitz change control and agent guardrails: [AGENTS.md](AGENTS.md)
 
 ## Slack Agent Status
