@@ -55,6 +55,7 @@ def http_json(method: str, url: str, payload: dict[str, Any] | None = None, head
 def wait_for_readiness(name: str, base_url: str, timeout_sec: int = 360) -> None:
     end = time.time() + timeout_sec
     last_status = "no response"
+    print(f"  waiting for {name} ({base_url}) ...", flush=True)
     while time.time() < end:
         result = http_json("GET", f"{base_url}/actuator/health/readiness")
         status = result.status
@@ -62,8 +63,11 @@ def wait_for_readiness(name: str, base_url: str, timeout_sec: int = 360) -> None
         if isinstance(result.body_json, dict):
             body_status = result.body_json.get("status")
         if status == 200 and body_status == "UP":
+            print(f"  {name}: UP", flush=True)
             return
         last_status = f"status={status}, body={result.body_text[:180]}"
+        elapsed = int(timeout_sec - (end - time.time()))
+        print(f"  {name}: not ready ({last_status}) [{elapsed}s elapsed]", flush=True)
         time.sleep(2)
     raise RuntimeError(f"readiness timeout for {name}: {last_status}")
 
@@ -76,9 +80,12 @@ def ensure(condition: bool, message: str) -> None:
 def wait_for_broker_submit_delta(broker_url: str, baseline: int, timeout_sec: int = 90) -> int:
     """Poll broker stats until total_submit_count exceeds baseline. Returns new count."""
     end = time.time() + timeout_sec
+    print(f"  polling broker for submit delta (baseline={baseline}, timeout={timeout_sec}s) ...", flush=True)
     while time.time() < end:
         result = http_json("GET", f"{broker_url}/internal/smoke/stats")
         current = int(get_nested(result.body_json, "total_submit_count") or 0)
+        elapsed = int(timeout_sec - (end - time.time()))
+        print(f"  broker submit count={current} baseline={baseline} [{elapsed}s elapsed]", flush=True)
         if current > baseline:
             return current
         time.sleep(2)
@@ -146,10 +153,13 @@ def main() -> int:
     }
 
     try:
+        print("\n=== Phase 1: service readiness ===", flush=True)
         for name, url in services.items():
             wait_for_readiness(name, url)
         summaries.append("All service readiness probes returned UP")
+        print("  all services UP", flush=True)
 
+        print("\n=== Phase 2: ingress idempotency ===", flush=True)
         ingress_idempotency_key = f"smoke-idem-{ts}"
         payload = {
             "idempotency_key": ingress_idempotency_key,
@@ -191,7 +201,9 @@ def main() -> int:
         ensure(first_id is not None and first_id == second_id, "expected replay ingress_event_id to match")
         ensure(third.status == 409, f"expected conflict ingress status 409, got {third.status}")
         summaries.append("Ingress idempotency replay/conflict checks passed")
+        print("  ingress idempotency passed", flush=True)
 
+        print("\n=== Phase 3: risk->order->broker command path ===", flush=True)
         order_reset = http_json("POST", f"{order_url}/internal/smoke/reset", {})
         details["steps"]["order_reset"] = {
             "status": order_reset.status,
@@ -228,7 +240,9 @@ def main() -> int:
         submit_count_delta = broker_after_count - broker_before_count
         ensure(submit_count_delta == 1, f"expected broker submit delta 1 after retry, got {submit_count_delta}")
         summaries.append("Risk->Order->Broker command path retry dedupe passed")
+        print("  command path passed", flush=True)
 
+        print("\n=== Phase 4: 60s timeout freeze drill ===", flush=True)
         timeout_result = http_json("POST", f"{order_url}/internal/smoke/timeout-drill", {
             "idempotency_key": f"smoke-timeout-{ts}",
         })
@@ -258,12 +272,14 @@ def main() -> int:
         ensure(int(get_nested(order_stats.body_json, "first_status_timeout_count") or 0) >= 1, "expected timeout counter >= 1")
         ensure(int(get_nested(order_stats.body_json, "alert_count") or 0) >= 1, "expected alert count >= 1")
         summaries.append("60s timeout freeze + critical alert drill passed")
+        print("  timeout drill passed", flush=True)
 
         # ------------------------------------------------------------------ #
         # Phase 5 — Full async Kafka pipeline                                 #
         # Ingress -> Kafka -> event-processor -> agent-runtime -> risk ->     #
         # order -> IBKR broker                                                #
         # ------------------------------------------------------------------ #
+        print("\n=== Phase 5: full async Kafka pipeline ===", flush=True)
         pipeline_reset = http_json("POST", f"{order_url}/internal/smoke/reset", {})
         details["steps"]["pipeline_reset"] = {
             "status": pipeline_reset.status,
@@ -306,9 +322,10 @@ def main() -> int:
         details["steps"]["pipeline_ingress"]["broker_delta"] = pipeline_delta
         ensure(pipeline_delta == 1, f"expected async pipeline broker delta 1, got {pipeline_delta}")
         summaries.append("Full async pipeline (Ingress->Kafka->event-processor->agent-runtime->risk->order->IBKR) passed")
+        print("  async pipeline passed", flush=True)
 
         report = write_reports("PASS", summaries, details, ts)
-        print(f"smoke-local PASS -> {report}")
+        print(f"\nsmoke-local PASS -> {report}")
         return 0
 
     except Exception as ex:  # noqa: BLE001
