@@ -20,86 +20,232 @@ Grafana credentials: set via `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` in 
 
 ---
 
-## 2. Grafana
+## 2. Grafana + Loki — Local Dev and Troubleshooting Guide
 
-### 2.1 Reliability Dashboard
+### 2.1 First-Time Login
 
-**URL**: http://localhost:3000/d/autotrading-reliability
+1. Run `make up` — wait until all services are healthy (~60–90 s on first build)
+2. Open **http://localhost:3000**
+3. Login with:
+   - **Username**: `admin`
+   - **Password**: `admin`
+   (Customise in `infra/local/.env.compose.example` via `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`)
+4. Skip the "change password" prompt for local use — click **Skip**
+5. The home screen shows the pre-provisioned dashboards — both **Loki** and **Prometheus** datasources are wired automatically, no manual setup needed
 
-Pre-built panels (auto-refresh every 15 s):
+---
 
-| Panel | Metric | Green/Red threshold |
-|---|---|---|
-| First-Status Timeout Count | `autotrading_reliability_first_status_timeout_count` | Red if > 0 — trading is FROZEN |
-| Outbox Backlog Age (ms) | `autotrading_reliability_outbox_backlog_age_ms` | Red if > 60,000 ms |
-| Duplicate Suppression Count | `autotrading_reliability_duplicate_suppression_count` | Per-service time-series |
+### 2.2 Viewing Logs (Loki via Explore)
 
-### 2.2 Explore: Log Search
+**Path**: Left sidebar → **Explore** (compass icon) → datasource dropdown → select **Loki**
 
-**URL**: http://localhost:3000/explore — select datasource **Loki**
+The Explore view has three parts:
+- **Label filters** (top) — filter by Docker label (service name, compose project)
+- **Line contains** (middle) — full-text search within matching log lines
+- **Time range** (top right) — default is last 1 hour; for live tail click the **Live** toggle
 
-Useful LogQL snippets:
+**Quickest way to start**: click the label dropdown, pick `service`, pick a service name, then hit **Run query**.
+
+#### LogQL reference — copy/paste these directly into the query field
 
 ```logql
+# ── Scope by service ──────────────────────────────────────────
 # All logs for one service
 {service="risk-service"}
 
 # All logs across all autotrading services
 {compose_project="autotrading"}
 
-# Errors across all services
+# ── Text search (|= "string") ─────────────────────────────────
+# All errors across all services
 {compose_project="autotrading"} |= "ERROR"
 
-# Trace a request end-to-end by trace_id
+# All WARN and above (both keywords)
+{compose_project="autotrading"} |= "WARN"
+
+# Startup/init messages only
+{compose_project="autotrading"} |= "Started "
+
+# ── Trace a single request end-to-end ─────────────────────────
+# By trace_id (one attempt, all services)
 {compose_project="autotrading"} |= "trace_id=trc-abc-123"
 
-# Follow a specific order intent
-{compose_project="autotrading"} |= "order_intent_id=oi-xyz"
-
-# Follow an idempotency key
+# By idempotency_key (all retries of the same business request)
 {compose_project="autotrading"} |= "idempotency_key=k-abc-123"
 
-# Follow an agent's activity
+# ── Scope to a domain concept ─────────────────────────────────
+# All activity for one order
+{compose_project="autotrading"} |= "order_intent_id=oi-xyz-789"
+
+# All activity for one agent
 {compose_project="autotrading"} |= "agent_id=agent-alpha"
 
-# gRPC errors only
+# All activity for one signal
+{compose_project="autotrading"} |= "signal_id=sig-xyz"
+
+# All activity for one symbol
+{compose_project="autotrading"} |= "instrument_id=AAPL"
+
+# ── gRPC / infrastructure errors ─────────────────────────────
+# gRPC status exceptions
 {compose_project="autotrading"} |= "StatusRuntimeException"
 
 # Outbox publish failures
 {service="order-service"} |= "FAILED" |= "outbox"
 
-# Parse structured fields for filtering (logfmt-style MDC in log lines)
+# Kafka consumer errors
+{compose_project="autotrading"} |= "KafkaListenerErrorHandler"
+
+# ── Advanced: parse MDC fields as structured labels ───────────
+# Extract trace_id as a label and filter on it
 {compose_project="autotrading"}
-  | regexp `trace_id=(?P<trace_id>\S+).*idempotency_key=(?P<idempotency_key>\S+)`
+  | regexp `trace_id=(?P<trace_id>\S+)`
   | trace_id = "trc-abc-123"
+
+# Extract multiple fields and filter
+{compose_project="autotrading"}
+  | regexp `trace_id=(?P<trace_id>\S+).*agent_id=(?P<agent_id>\S+)`
+  | agent_id = "agent-alpha"
 ```
 
-### 2.3 Explore: Prometheus Metrics
+**Tips**:
+- Click any log line to expand it — Grafana shows the raw line plus extracted labels
+- Use **Add to filter** buttons on expanded labels to build LogQL visually without typing
+- The **Live** toggle (top right) live-tails logs as they arrive — useful when running a smoke test
 
-**URL**: http://localhost:3000/explore — select datasource **Prometheus**
+---
+
+### 2.3 Reliability Dashboard
+
+**Path**: Left sidebar → **Dashboards** → **Autotrading Reliability**  
+Direct URL: http://localhost:3000/d/autotrading-reliability
+
+Pre-built panels (auto-refresh every 15 s):
+
+| Panel | Metric | Green → Red threshold |
+|---|---|---|
+| First-Status Timeout Count | `autotrading_reliability_first_status_timeout_count` | Any value > 0 means trading is FROZEN |
+| Outbox Backlog Age (ms) | `autotrading_reliability_outbox_backlog_age_ms` | > 60,000 ms means Kafka/outbox stalled |
+| Duplicate Suppression Count | `autotrading_reliability_duplicate_suppression_count` | Time-series per service |
+
+**Workflow**: Open this dashboard before running any smoke test. Leave it open on a second monitor. A red panel immediately tells you which layer broke without needing to read logs first.
+
+---
+
+### 2.4 Explore: Prometheus Metrics
+
+**Path**: Explore → datasource dropdown → **Prometheus**
 
 ```promql
 # All services up (1) / down (0)
 up{job=~".*-service|monitoring-api"}
 
-# HTTP 5xx error rate per service (Spring Boot Actuator)
+# HTTP 5xx rate per service
 rate(http_server_requests_seconds_count{status=~"5.."}[1m])
 
-# Outbox backlog age per service
+# Outbox backlog age (per service)
 autotrading_reliability_outbox_backlog_age_ms
 
-# Duplicate suppression rate (last 5m)
+# Duplicate suppression rate (last 5 min)
 increase(autotrading_reliability_duplicate_suppression_count[5m])
 
-# JVM heap usage per service
+# JVM heap % used per service
 jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}
 
-# gRPC method call rate
+# gRPC calls total
 grpc_server_calls_total
 
 # DB connection pool saturation
 hikaricp_connections_active / hikaricp_connections_max
 ```
+
+---
+
+### 2.5 Sample Troubleshooting Walkthroughs
+
+#### "I sent a trade — nothing happened. Where did it die?"
+
+1. Get the `idempotency_key` or `trace_id` from your request (returned in the HTTP response body or `X-Request-Id` header)
+2. Go to **Explore → Loki**
+3. Paste:
+   ```logql
+   {compose_project="autotrading"} |= "idempotency_key=k-abc-123"
+   ```
+4. Read the results top-to-bottom. The last service that logged this key is where it stopped
+5. Expand the last matching line → look at `level` — if it's `ERROR` or `WARN` the message explains why
+
+Alternatively from the terminal:
+```bash
+python3 scripts/trace.py --idempotency-key k-abc-123
+```
+
+---
+
+#### "Risk service rejected an order — why?"
+
+1. Find the `signal_id` from the agent-runtime log or HTTP response
+2. In Loki Explore:
+   ```logql
+   {service="risk-service"} |= "signal_id=sig-xyz"
+   ```
+3. Look for a line containing `DENY` or `decision=DENY` — expand it to see `matched_rule_ids`
+4. Cross-reference the rule ID against `specs/vendor/docs/source-of-truth/`
+
+---
+
+#### "Order is stuck — it was submitted but never filled"
+
+1. In Loki Explore:
+   ```logql
+   {service="order-service"} |= "WARN"
+   ```
+   Look for `status_timeout_60s` — this means the 60 s watchdog fired and trading is now FROZEN
+
+2. Check current system state:
+   ```bash
+   curl -s http://localhost:18084/api/v1/system/health | jq '{tradingMode, killSwitch}'
+   ```
+
+3. Check the broker layer:
+   ```logql
+   {service="ibkr-connector-service"} |= "order_intent_id=oi-xyz-789"
+   ```
+
+4. After confirming broker is healthy, unfreeze:
+   ```bash
+   curl -s -X POST http://localhost:18084/api/v1/system/trading-mode \
+     -H "Content-Type: application/json" \
+     -d '{"trading_mode": "NORMAL"}'
+   ```
+
+---
+
+#### "I restarted a service — did it pick up all its state correctly?"
+
+```logql
+{service="monitoring-api"} |= "Restored"
+```
+Should show: `Restored system controls — tradingMode=NORMAL killSwitch=false`
+
+```logql
+{service="order-service"} |= "WatchdogLifecycle"
+```
+Should show the watchdog starting up.
+
+```logql
+{service="risk-service"} |= "Started RiskDecisionGrpcService"
+```
+
+---
+
+#### "I'm getting duplicate suppression warnings — is the system retrying too aggressively?"
+
+```logql
+{compose_project="autotrading"} |= "REPLAY"
+```
+Each `REPLAY` line shows the `idempotency_key` being suppressed. If many different keys are showing `REPLAY` it's a retry storm; if it's the same key repeatedly it's a single client looping.
+
+Also check in the Reliability Dashboard — the **Duplicate Suppression Count** panel shows rate per service over time, which makes it easy to see when it started.
 
 ---
 
