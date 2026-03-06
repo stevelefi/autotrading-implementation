@@ -48,6 +48,7 @@ def write_manifest(dest: Path) -> Path:
 def cmd_sync(args: argparse.Namespace) -> int:
     dest = Path(args.dest)
     version_file = Path(args.version_file)
+    expected_dest = str(dest).replace("\\", "/")
 
     with tempfile.TemporaryDirectory(prefix="spec-sync-") as tmp:
         tmpdir = Path(tmp)
@@ -69,13 +70,32 @@ def cmd_sync(args: argparse.Namespace) -> int:
 
     manifest_path = write_manifest(dest)
 
+    existing_version: dict | None = None
+    if version_file.exists():
+        try:
+            existing_version = json.loads(version_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            existing_version = None
+
+    preserve_timestamp = (
+        existing_version is not None
+        and existing_version.get("repo_url") == args.repo_url
+        and existing_version.get("ref") == args.ref
+        and existing_version.get("dest") == expected_dest
+        and bool(existing_version.get("synced_at_utc"))
+    )
+
     version_payload = {
         "repo_url": args.repo_url,
         "ref": args.ref,
-        "synced_at_utc": now_utc(),
-        "dest": str(dest).replace("\\", "/"),
+        "synced_at_utc": (
+            existing_version["synced_at_utc"] if preserve_timestamp else now_utc()
+        ),
+        "dest": expected_dest,
     }
-    version_file.write_text(json.dumps(version_payload, indent=2) + "\n", encoding="utf-8")
+    serialized_version = json.dumps(version_payload, indent=2) + "\n"
+    if not version_file.exists() or version_file.read_text(encoding="utf-8") != serialized_version:
+        version_file.write_text(serialized_version, encoding="utf-8")
 
     print(f"synced spec docs to {docs_dest}")
     print(f"wrote manifest: {manifest_path}")

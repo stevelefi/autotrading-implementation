@@ -21,6 +21,33 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Sync pinned spec snapshot
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+
+          with open("SPEC_VERSION.json", "r", encoding="utf-8") as f:
+              v = json.load(f)
+
+          subprocess.run(
+              [
+                  "python",
+                  "tools/spec_sync.py",
+                  "sync",
+                  "--repo-url",
+                  v["repo_url"],
+                  "--ref",
+                  v["ref"],
+                  "--dest",
+                  "specs/vendor",
+                  "--version-file",
+                  "SPEC_VERSION.json",
+              ],
+              check=True,
+          )
+          PY
+
       - name: Verify pinned spec snapshot
         run: |
           python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json

@@ -1,5 +1,24 @@
+# Python
 __pycache__/
-*.pyc
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
+
+# Local env
 .env.local
+.env
+.env.*
+!.env.example
+!**/.env.example
+!**/.env.*.example
+
+# OS
 .DS_Store
+
+# Pulled spec artifacts (generated via tools/spec_sync.py)
+specs/vendor/
