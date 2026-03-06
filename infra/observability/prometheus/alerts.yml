@@ -1,0 +1,29 @@
+groups:
+  - name: autotrading.reliability
+    rules:
+      - alert: FirstStatusTimeoutHigh
+        expr: sum(autotrading_reliability_first_status_timeout_count) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order first-status timeout detected"
+          description: "One or more orders did not receive a first broker status within 60 seconds. Trading mode may be FROZEN."
+
+      - alert: OutboxBacklogStale
+        expr: max(autotrading_reliability_outbox_backlog_age_ms) > 60000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox backlog age exceeds 60 seconds"
+          description: "The oldest pending outbox event is more than 60 seconds old. Check Kafka/Redpanda connectivity and dispatcher health."
+
+      - alert: DuplicateSuppressionCountRising
+        expr: sum(increase(autotrading_reliability_duplicate_suppression_count[5m])) > 10
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High duplicate event suppression rate"
+          description: "More than 10 duplicate events suppressed in the last 5 minutes. Investigate upstream retry storms."

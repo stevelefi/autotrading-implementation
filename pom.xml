@@ -32,6 +32,9 @@
     <grpc.version>1.66.0</grpc.version>
     <protobuf.version>3.25.3</protobuf.version>
     <junit.version>5.11.3</junit.version>
+    <jacoco.version>0.8.14</jacoco.version>
+    <coverage.minimum.line>0.50</coverage.minimum.line>
+    <coverage.check.skip>true</coverage.check.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -85,7 +88,71 @@
           <artifactId>spring-boot-maven-plugin</artifactId>
           <version>${spring-boot.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
   </build>
+
+  <profiles>
+    <profile>
+      <id>coverage-core</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-agent</id>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>report</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>report</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>check</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+                <configuration>
+                  <skip>${coverage.check.skip}</skip>
+                  <excludes>
+                    <exclude>**/*Application.class</exclude>
+                    <exclude>**/*Grpc.class</exclude>
+                    <exclude>**/*Grpc$*.class</exclude>
+                    <exclude>**/*Proto*.class</exclude>
+                    <exclude>**/*OuterClass*.class</exclude>
+                    <exclude>**/*OrBuilder.class</exclude>
+                  </excludes>
+                  <rules>
+                    <rule>
+                      <element>BUNDLE</element>
+                      <limits>
+                        <limit>
+                          <counter>LINE</counter>
+                          <value>COVEREDRATIO</value>
+                          <minimum>${coverage.minimum.line}</minimum>
+                        </limit>
+                      </limits>
+                    </rule>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

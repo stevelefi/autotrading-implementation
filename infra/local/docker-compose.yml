@@ -44,6 +44,68 @@ services:
       redpanda:
         condition: service_healthy
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.118.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ../observability/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT}:4317"
+      - "${OTEL_HTTP_PORT}:4318"
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    volumes:
+      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  loki:
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ../observability/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT}:3100"
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    command: ["-config.file=/etc/promtail/config.yaml"]
+    volumes:
+      - ../observability/promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ../observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+
   ibkr-simulator:
     image: wiremock/wiremock:3.13.2
     command: ["--global-response-templating", "--verbose"]
@@ -59,12 +121,22 @@ services:
       GRPC_SERVER_PORT: 9093
       IBKR_MODE: SIMULATOR
       IBKR_SIMULATOR_BASE_URL: http://ibkr-simulator:8080
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: ibkr-connector-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       postgres:
         condition: service_healthy
       redpanda:
         condition: service_healthy
       ibkr-simulator:
+        condition: service_started
+      otel-collector:
         condition: service_started
     ports:
       - "18083:8080"
@@ -84,6 +156,14 @@ services:
       GRPC_SERVER_PORT: 9092
       BROKER_GRPC_HOST: ibkr-connector-service
       BROKER_GRPC_PORT: 9093
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: order-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,6 +171,8 @@ services:
         condition: service_healthy
       ibkr-connector-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18082:8080"
       - "19092:9092"
@@ -109,6 +191,14 @@ services:
       GRPC_SERVER_PORT: 9091
       ORDER_GRPC_HOST: order-service
       ORDER_GRPC_PORT: 9092
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: risk-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,6 +206,8 @@ services:
         condition: service_healthy
       order-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18081:8080"
       - "19091:9091"
@@ -135,11 +227,21 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: ingress-gateway-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       postgres:
         condition: service_healthy
       redpanda:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18080:8080"
     healthcheck:
@@ -155,11 +257,21 @@ services:
     environment:
       SERVER_PORT: 8080
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: event-processor-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       redpanda:
         condition: service_healthy
       ingress-gateway-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18085:8080"
     healthcheck:
@@ -175,6 +287,14 @@ services:
     environment:
       SERVER_PORT: 8080
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: agent-runtime-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       redpanda:
         condition: service_healthy
@@ -182,6 +302,8 @@ services:
         condition: service_healthy
       risk-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18086:8080"
     healthcheck:
@@ -197,11 +319,21 @@ services:
     environment:
       SERVER_PORT: 8080
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: performance-service
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       redpanda:
         condition: service_healthy
       ibkr-connector-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18087:8080"
     healthcheck:
@@ -217,6 +349,14 @@ services:
     environment:
       SERVER_PORT: 8080
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      OTEL_SERVICE_NAME: monitoring-api
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
     depends_on:
       risk-service:
         condition: service_healthy
@@ -224,6 +364,8 @@ services:
         condition: service_healthy
       ingress-gateway-service:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - "18084:8080"
     healthcheck:
@@ -231,3 +373,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  loki-data:

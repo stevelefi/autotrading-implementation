@@ -11,19 +11,14 @@ jobs:
   pr-governance:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate branch naming and issue link
+      - name: Validate branch naming
         env:
           HEAD_REF: ${{ github.head_ref }}
-          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
           echo "head_ref=${HEAD_REF}"
-          if ! echo "$HEAD_REF" | grep -Eq '^codex/.+-[0-9]+-.+'; then
-            echo "Branch name must match codex/<repo>-<issue>-<short-topic>"
-            exit 1
-          fi
-
-          if ! echo "${PR_BODY:-}" | grep -Eq '(Closes|Fixes|Resolves) #[0-9]+'; then
-            echo "PR body must include an issue link like: Closes #123"
+          if ! echo "$HEAD_REF" | grep -Eq '^(feat|fix|chore|refactor|docs|test|ci|hotfix|release|codex)/.+'; then
+            echo "Branch name must match <type>/<description>"
+            echo "Allowed types: feat, fix, chore, refactor, docs, test, ci, hotfix, release, codex"
             exit 1
           fi

@@ -2,10 +2,11 @@ name: agent-status
 
 on:
   pull_request:
-    types: [opened, synchronize, labeled, closed]
+    types: [opened, labeled, closed]
   issues:
     types: [closed]
-  check_run:
+  workflow_run:
+    workflows: ["ci"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -60,18 +61,6 @@ jobs:
       summary: ${{ github.event.pull_request.title }}
       url: ${{ github.event.pull_request.html_url }}
 
-  pr-sync:
-    if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
-    uses: stevelefi/autotrading-devops/.github/workflows/slack-agent-status-reusable.yml@main
-    secrets: inherit
-    with:
-      repo: ${{ github.repository }}
-      work_item_id: ${{ github.event.pull_request.number }}
-      agent_name: ${{ github.actor }}
-      status: IN_PROGRESS
-      summary: New commits pushed to PR #${{ github.event.pull_request.number }}
-      url: ${{ github.event.pull_request.html_url }}
-
   pr-labeled-blocked:
     if: github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'blocked'
     uses: stevelefi/autotrading-devops/.github/workflows/slack-agent-status-reusable.yml@main
@@ -109,17 +98,17 @@ jobs:
       summary: Issue closed
       url: ${{ github.event.issue.html_url }}
 
-  check-failed-blocked:
-    if: github.event_name == 'check_run' && github.event.action == 'completed' && github.event.check_run.conclusion == 'failure' && github.event.check_run.pull_requests[0] != null && !contains(github.event.check_run.name, 'agent-status')
+  ci-failed-blocked:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.pull_requests[0] != null
     uses: stevelefi/autotrading-devops/.github/workflows/slack-agent-status-reusable.yml@main
     secrets: inherit
     with:
       repo: ${{ github.repository }}
-      work_item_id: ${{ github.event.check_run.pull_requests[0].number }}
+      work_item_id: ${{ github.event.workflow_run.pull_requests[0].number }}
       agent_name: ${{ github.actor }}
       status: BLOCKED
-      summary: Check failed - ${{ github.event.check_run.name }}
-      url: ${{ github.event.check_run.html_url }}
+      summary: CI failed - ${{ github.event.workflow_run.name }}
+      url: ${{ github.event.workflow_run.html_url }}
       severity: P1
 
   manual-status:

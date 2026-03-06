@@ -1,16 +1,26 @@
 package com.autotrading.services.risk.runtime;
 
-import com.autotrading.command.v1.OrderCommandServiceGrpc;
-import com.autotrading.services.risk.core.SimplePolicyEngine;
-import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.autotrading.command.v1.OrderCommandServiceGrpc;
+import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
+import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
+import com.autotrading.services.risk.core.SimplePolicyEngine;
+import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
+
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.micrometer.core.instrument.MeterRegistry;
+
 @Configuration
 public class RiskRuntimeConfiguration {
+
+  @Bean
+  ReliabilityMetrics reliabilityMetrics(MeterRegistry meterRegistry) {
+    return new ReliabilityMetrics(meterRegistry);
+  }
 
   @Bean(destroyMethod = "shutdownNow")
   ManagedChannel orderGrpcChannel(
@@ -39,7 +49,8 @@ public class RiskRuntimeConfiguration {
   @Bean
   RiskGrpcServerLifecycle riskGrpcServerLifecycle(
       RiskDecisionGrpcService grpcService,
+      GrpcCorrelationServerInterceptor correlationInterceptor,
       @Value("${grpc.server.port:9091}") int grpcPort) {
-    return new RiskGrpcServerLifecycle(grpcService, grpcPort);
+    return new RiskGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }
