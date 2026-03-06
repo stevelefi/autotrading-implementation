@@ -2,7 +2,9 @@ SHELL := /bin/bash
 
 COMPOSE := docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml
 
-.PHONY: up down logs build restart validate test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template pre-commit
+.PHONY: up down down-infra logs build restart validate ci-local test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template pre-commit
+
+APP_SERVICES := ingress-gateway-service event-processor-service agent-runtime-service risk-service order-service ibkr-connector-service performance-service monitoring-api
 
 build:
 	$(COMPOSE) build
@@ -19,7 +21,23 @@ validate:
 	@echo "=== Running smoke suite ==="
 	$(MAKE) smoke-local
 
+ci-local:
+	@STATUS=0; \
+	$(MAKE) build up || STATUS=$$?; \
+	if [ $$STATUS -eq 0 ]; then $(MAKE) validate || STATUS=$$?; fi; \
+	if [ $$STATUS -ne 0 ]; then \
+		echo ""; \
+		echo "=== ci-local FAILED (exit $$STATUS) — last 40 log lines per service ==="; \
+		$(COMPOSE) logs --tail=40 2>&1; \
+	fi; \
+	$(MAKE) down; \
+	exit $$STATUS
+
 down:
+	$(COMPOSE) stop $(APP_SERVICES)
+	$(COMPOSE) rm -f $(APP_SERVICES)
+
+down-infra:
 	$(COMPOSE) down -v
 
 logs:
