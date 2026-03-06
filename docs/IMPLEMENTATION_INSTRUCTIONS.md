@@ -3,6 +3,8 @@
 ## Purpose
 Production-standard workflow for implementing and shipping changes in this repository.
 
+> **Spec and charter**: The authoritative mission, scope, and escalation rules for this repo are in [repo-charters/autotrading-implementation.md](https://github.com/stevelefi/autotrading/blob/main/docs/repo-charters/autotrading-implementation.md). Contract and API specs live in [SERVICE\_CONTRACTS.md](https://github.com/stevelefi/autotrading/blob/main/docs/SERVICE_CONTRACTS.md) in the spec repo.
+
 ## 1. Baseline and Contract Discipline
 
 1. `SPEC_VERSION.json` is authoritative for the spec baseline (current: `spec-v1.0.1-m0m1`).

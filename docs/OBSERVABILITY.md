@@ -2,6 +2,8 @@
 
 Monitoring, log correlation, and issue-tracing playbook for the autotrading system.
 
+> **Design context**: This doc covers the operational running system. For the observability spec, alert taxonomy (P0/P1/P2), and SLO targets see [OBSERVABILITY\_AND\_ALERTING.md](https://github.com/stevelefi/autotrading/blob/main/docs/OBSERVABILITY_AND_ALERTING.md) in the spec repo.
+
 ---
 
 ## 1. UI Quick Reference

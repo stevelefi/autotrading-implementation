@@ -1,5 +1,7 @@
 # Data Flow
 
+> **Design context**: For the canonical sequence diagrams, domain model, and consistency requirements that this flow implements, see [design/04-sequence-diagrams.md](https://github.com/stevelefi/autotrading/blob/main/docs/design/04-sequence-diagrams.md) and [ORDER\_CONSISTENCY\_AND\_RECONCILIATION.md](https://github.com/stevelefi/autotrading/blob/main/docs/ORDER_CONSISTENCY_AND_RECONCILIATION.md) in the spec repo.
+
 ## 1. Happy-Path Signal-to-Fill Flow
 
 ```
