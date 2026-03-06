@@ -6,6 +6,7 @@ Before writing code, agents must:
 2. Read `specs/vendor/docs/contracts/**`.
 3. Read `specs/vendor/docs/source-of-truth/**`.
 4. Read relevant service docs under `specs/vendor/docs/`.
+5. Read repo charter index `specs/vendor/docs/repo-charters/README.md` and applicable repo charter `specs/vendor/docs/repo-charters/autotrading-implementation.md`.
 
 ## Spec Pinning Guardrail
 1. `SPEC_VERSION.json` is authoritative for spec baseline.
