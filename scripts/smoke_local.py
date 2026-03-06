@@ -73,6 +73,20 @@ def ensure(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def wait_for_broker_submit_delta(broker_url: str, baseline: int, timeout_sec: int = 90) -> int:
+    """Poll broker stats until total_submit_count exceeds baseline. Returns new count."""
+    end = time.time() + timeout_sec
+    while time.time() < end:
+        result = http_json("GET", f"{broker_url}/internal/smoke/stats")
+        current = int(get_nested(result.body_json, "total_submit_count") or 0)
+        if current > baseline:
+            return current
+        time.sleep(2)
+    raise RuntimeError(
+        f"async pipeline timeout: broker submit count did not increase above {baseline} within {timeout_sec}s"
+    )
+
+
 def get_nested(obj: Any, *keys: str) -> Any:
     current = obj
     for key in keys:
@@ -244,6 +258,54 @@ def main() -> int:
         ensure(int(get_nested(order_stats.body_json, "first_status_timeout_count") or 0) >= 1, "expected timeout counter >= 1")
         ensure(int(get_nested(order_stats.body_json, "alert_count") or 0) >= 1, "expected alert count >= 1")
         summaries.append("60s timeout freeze + critical alert drill passed")
+
+        # ------------------------------------------------------------------ #
+        # Phase 5 — Full async Kafka pipeline                                 #
+        # Ingress -> Kafka -> event-processor -> agent-runtime -> risk ->     #
+        # order -> IBKR broker                                                #
+        # ------------------------------------------------------------------ #
+        pipeline_reset = http_json("POST", f"{order_url}/internal/smoke/reset", {})
+        details["steps"]["pipeline_reset"] = {
+            "status": pipeline_reset.status,
+            "body": pipeline_reset.body_json or pipeline_reset.body_text,
+        }
+        ensure(pipeline_reset.status == 200, f"expected pipeline reset status 200, got {pipeline_reset.status}")
+        ensure(
+            get_nested(pipeline_reset.body_json, "trading_mode") == "NORMAL",
+            "expected order-service trading mode NORMAL before pipeline test",
+        )
+
+        pipeline_broker_before = http_json("GET", f"{broker_url}/internal/smoke/stats")
+        pipeline_broker_baseline = int(get_nested(pipeline_broker_before.body_json, "total_submit_count") or 0)
+
+        pipeline_ingress_key = f"smoke-pipeline-{ts}"
+        pipeline_ingress_payload = {
+            "idempotency_key": pipeline_ingress_key,
+            "event_intent": "TRADE_SIGNAL",
+            "agent_id": "agent-smoke-pipeline",
+            "payload": {"side": "BUY", "qty": 1},
+        }
+        pipeline_ingress = http_json(
+            "POST",
+            f"{ingress_url}/ingress/v1/events",
+            pipeline_ingress_payload,
+            {"Authorization": "Bearer smoke-token", "X-Request-Id": "smoke-pipeline-1"},
+        )
+        details["steps"]["pipeline_ingress"] = {
+            "status": pipeline_ingress.status,
+            "body": pipeline_ingress.body_json or pipeline_ingress.body_text,
+            "broker_baseline": pipeline_broker_baseline,
+        }
+        ensure(pipeline_ingress.status == 202, f"expected pipeline ingress status 202, got {pipeline_ingress.status}")
+
+        pipeline_broker_final_count = wait_for_broker_submit_delta(
+            broker_url, pipeline_broker_baseline, timeout_sec=90
+        )
+        pipeline_delta = pipeline_broker_final_count - pipeline_broker_baseline
+        details["steps"]["pipeline_ingress"]["broker_final"] = pipeline_broker_final_count
+        details["steps"]["pipeline_ingress"]["broker_delta"] = pipeline_delta
+        ensure(pipeline_delta == 1, f"expected async pipeline broker delta 1, got {pipeline_delta}")
+        summaries.append("Full async pipeline (Ingress->Kafka->event-processor->agent-runtime->risk->order->IBKR) passed")
 
         report = write_reports("PASS", summaries, details, ts)
         print(f"smoke-local PASS -> {report}")

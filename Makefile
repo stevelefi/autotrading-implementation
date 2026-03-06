@@ -1,15 +1,29 @@
 SHELL := /bin/bash
 
-.PHONY: up down logs test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template pre-commit
+COMPOSE := docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml
+
+.PHONY: up down logs build restart validate test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec helm-lint helm-template pre-commit
+
+build:
+	$(COMPOSE) build
+
+restart: down build up
 
 up:
-	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml up -d --remove-orphans
+	$(COMPOSE) up -d --remove-orphans
+
+validate:
+	@echo "=== Container status ==="
+	$(COMPOSE) ps
+	@echo ""
+	@echo "=== Running smoke suite ==="
+	$(MAKE) smoke-local
 
 down:
-	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml down -v
+	$(COMPOSE) down -v
 
 logs:
-	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml logs -f --tail=200
+	$(COMPOSE) logs -f --tail=200
 
 test-unit:
 	mvn -B -DskipITs=true test
@@ -25,7 +39,7 @@ smoke-local:
 
 rollback-local:
 	@echo "Rollback primitive: stopping local services and preserving DB volume snapshot strategy"
-	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml stop
+	$(COMPOSE) stop
 
 verify-spec:
 	python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
