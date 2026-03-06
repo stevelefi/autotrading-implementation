@@ -1,21 +1,42 @@
 package com.autotrading.services.ibkr;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 
 import com.autotrading.command.v1.RequestContext;
 import com.autotrading.command.v1.CancelOrderRequest;
 import com.autotrading.command.v1.ReplaceOrderRequest;
 import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.command.v1.CommandStatus;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
+import com.autotrading.services.ibkr.db.BrokerOrderEntity;
+import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class BrokerConnectorEngineTest {
 
+  private BrokerConnectorEngine engine;
+
+  @BeforeEach
+  void setUp() {
+    BrokerOrderRepository mockRepo = mock(BrokerOrderRepository.class);
+    lenient().when(mockRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    OutboxRepository mockOutbox = mock(OutboxRepository.class);
+    engine = new BrokerConnectorEngine(
+        new InMemoryIdempotencyService(),
+        mockRepo,
+        mockOutbox,
+        new ObjectMapper());
+  }
+
   @Test
   void grpcRetryWithSameKeyDoesNotDuplicateSubmit() {
-    BrokerConnectorEngine engine = new BrokerConnectorEngine();
-
     SubmitOrderRequest request = SubmitOrderRequest.newBuilder()
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-1")
@@ -43,8 +64,6 @@ class BrokerConnectorEngineTest {
 
   @Test
   void duplicateExecCallbackIsIgnored() {
-    BrokerConnectorEngine engine = new BrokerConnectorEngine();
-
     boolean first = engine.recordExecution("exec-1");
     boolean second = engine.recordExecution("exec-1");
 
@@ -54,8 +73,6 @@ class BrokerConnectorEngineTest {
 
   @Test
   void sameIdempotencyKeyWithDifferentPayloadIsRejected() {
-    BrokerConnectorEngine engine = new BrokerConnectorEngine();
-
     SubmitOrderRequest first = baseSubmitRequest("idem-conflict", "ord-1", 10);
     SubmitOrderRequest conflicting = baseSubmitRequest("idem-conflict", "ord-1", 20);
 
@@ -69,8 +86,6 @@ class BrokerConnectorEngineTest {
 
   @Test
   void cancelAndReplaceAreAccepted() {
-    BrokerConnectorEngine engine = new BrokerConnectorEngine();
-
     var cancel = engine.cancel(CancelOrderRequest.newBuilder()
         .setRequestContext(baseContext("idem-cancel"))
         .setAgentId("agent-1")

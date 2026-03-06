@@ -3,6 +3,11 @@ package com.autotrading.services.ibkr;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import com.autotrading.command.v1.RequestContext;
@@ -14,7 +19,9 @@ class IbkrSmokeControllerTest {
 
     @Test
     void statsReturnsZeroSubmitCountInitially() {
-        IbkrSmokeController controller = new IbkrSmokeController(new BrokerConnectorEngine());
+        IbkrSmokeController controller = new IbkrSmokeController(
+                new BrokerConnectorEngine(new InMemoryIdempotencyService(),
+                        mock(BrokerOrderRepository.class), mock(OutboxRepository.class), new ObjectMapper()));
 
         Map<String, Object> stats = controller.stats();
 
@@ -24,7 +31,8 @@ class IbkrSmokeControllerTest {
 
     @Test
     void statsReflectsTotalSubmitCountAfterSubmissions() {
-        BrokerConnectorEngine engine = new BrokerConnectorEngine();
+        BrokerConnectorEngine engine = new BrokerConnectorEngine(new InMemoryIdempotencyService(),
+                mock(BrokerOrderRepository.class), mock(OutboxRepository.class), new ObjectMapper());
         IbkrSmokeController controller = new IbkrSmokeController(engine);
 
         engine.submit(SubmitOrderRequest.newBuilder()

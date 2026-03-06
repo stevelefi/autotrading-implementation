@@ -34,6 +34,7 @@ COMPOSE_FILE = ROOT / "infra/local/docker-compose.yml"
 
 INFRA_SERVICES = [
     "postgres",
+    "flyway-init",
     "redpanda",
     "redpanda-init",
     "redpanda-console",

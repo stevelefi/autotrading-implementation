@@ -3,13 +3,19 @@ package com.autotrading.services.order.runtime;
 import java.time.Clock;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
+import com.autotrading.libs.idempotency.IdempotencyService;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.core.OrderSafetyEngine;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
 import com.autotrading.services.order.grpc.OrderCommandGrpcService;
 
 import io.grpc.ManagedChannel;
@@ -17,6 +23,9 @@ import io.grpc.ManagedChannelBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(basePackages = "com.autotrading.services.order.db")
+@EntityScan(basePackages = "com.autotrading.services.order.db")
 public class OrderRuntimeConfiguration {
 
   @Bean
@@ -42,8 +51,12 @@ public class OrderRuntimeConfiguration {
   }
 
   @Bean
-  OrderSafetyEngine orderSafetyEngine(ReliabilityMetrics reliabilityMetrics, Clock clock) {
-    return new OrderSafetyEngine(reliabilityMetrics, clock);
+  OrderSafetyEngine orderSafetyEngine(ReliabilityMetrics reliabilityMetrics, Clock clock,
+                                       IdempotencyService idempotencyService,
+                                       OrderIntentRepository orderIntentRepository,
+                                       OrderLedgerRepository orderLedgerRepository) {
+    return new OrderSafetyEngine(reliabilityMetrics, clock, idempotencyService,
+        orderIntentRepository, orderLedgerRepository);
   }
 
   @Bean
@@ -69,3 +82,4 @@ public class OrderRuntimeConfiguration {
     return new OrderGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }
+

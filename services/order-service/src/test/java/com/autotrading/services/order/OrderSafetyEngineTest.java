@@ -23,6 +23,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
+import static org.mockito.Mockito.mock;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +51,10 @@ class OrderSafetyEngineTest {
 
     ReliabilityMetrics metrics = new ReliabilityMetrics();
     Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
-    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class));
 
     CreateOrderIntentRequest request = baseRequest("idem-timeout");
     var response = engine.createOrderIntent(request, brokerStub);
@@ -69,7 +76,10 @@ class OrderSafetyEngineTest {
 
     ReliabilityMetrics metrics = new ReliabilityMetrics();
     Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
-    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class));
 
     CreateOrderIntentRequest request = baseRequest("idem-duplicate");
     var first = engine.createOrderIntent(request, brokerStub);
@@ -87,7 +97,10 @@ class OrderSafetyEngineTest {
 
     ReliabilityMetrics metrics = new ReliabilityMetrics();
     Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
-    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class));
 
     CreateOrderIntentRequest deniedRequest = baseRequest("idem-denied").toBuilder()
         .setDecision(Decision.DECISION_DENY)
@@ -106,7 +119,10 @@ class OrderSafetyEngineTest {
 
     ReliabilityMetrics metrics = new ReliabilityMetrics();
     Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
-    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class));
 
     var created = engine.createOrderIntent(baseRequest("idem-ack"), brokerStub);
     engine.onBrokerStatus(created.getOrderIntentId());
@@ -126,7 +142,10 @@ class OrderSafetyEngineTest {
 
     ReliabilityMetrics metrics = new ReliabilityMetrics();
     Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
-    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class));
 
     CreateOrderIntentRequest first = baseRequest("idem-conflict");
     CreateOrderIntentRequest conflicting = first.toBuilder().setQty(999).build();

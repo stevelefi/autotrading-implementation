@@ -8,6 +8,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,7 +70,10 @@ class OrderSmokeControllerTest {
 
         metrics    = new ReliabilityMetrics();
         clock      = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
-        engine     = new OrderSafetyEngine(metrics, clock);
+        engine     = new OrderSafetyEngine(metrics, clock,
+                new InMemoryIdempotencyService(),
+                mock(OrderIntentRepository.class),
+                mock(OrderLedgerRepository.class));
         controller = new OrderSmokeController(engine, brokerStub, metrics, clock);
     }
 

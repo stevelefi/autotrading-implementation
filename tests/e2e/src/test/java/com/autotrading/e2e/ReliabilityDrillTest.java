@@ -1,6 +1,10 @@
 package com.autotrading.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.autotrading.libs.reliability.inbox.ConsumerDeduper;
 import com.autotrading.libs.reliability.inbox.InMemoryConsumerInboxRepository;
@@ -54,7 +58,8 @@ class ReliabilityDrillTest {
     assertThat(sideEffects).containsExactly("applied");
     assertThat(metrics.duplicateSuppressionCount()).isEqualTo(1);
 
-    BrokerConnectorEngine connectorEngine = new BrokerConnectorEngine();
+    BrokerConnectorEngine connectorEngine = new BrokerConnectorEngine(
+        new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class), outbox, new ObjectMapper());
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isTrue();
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isFalse();
   }

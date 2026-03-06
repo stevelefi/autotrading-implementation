@@ -1,6 +1,14 @@
 package com.autotrading.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.risk.db.RiskDecisionRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.command.v1.EvaluateSignalRequest;
@@ -44,7 +52,9 @@ class VerticalSliceGrpcFlowTest {
 
   @Test
   void riskToOrderToBrokerFlowRunsAndDedupesRetries() throws Exception {
-    BrokerConnectorEngine brokerEngine = new BrokerConnectorEngine();
+    BrokerConnectorEngine brokerEngine = new BrokerConnectorEngine(
+        new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
+        mock(OutboxRepository.class), new ObjectMapper());
     String brokerName = InProcessServerBuilder.generateName();
     brokerServer = InProcessServerBuilder.forName(brokerName).directExecutor()
         .addService(new BrokerCommandGrpcService(brokerEngine))
@@ -55,7 +65,10 @@ class VerticalSliceGrpcFlowTest {
 
     OrderSafetyEngine orderEngine = new OrderSafetyEngine(
         new ReliabilityMetrics(),
-        Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC));
+        Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC),
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class));
 
     String orderName = InProcessServerBuilder.generateName();
     orderServer = InProcessServerBuilder.forName(orderName).directExecutor()
@@ -64,7 +77,8 @@ class VerticalSliceGrpcFlowTest {
     orderChannel = InProcessChannelBuilder.forName(orderName).directExecutor().build();
 
     OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub = OrderCommandServiceGrpc.newBlockingStub(orderChannel);
-    RiskDecisionGrpcService riskImpl = new RiskDecisionGrpcService(orderStub, new SimplePolicyEngine());
+    RiskDecisionGrpcService riskImpl = new RiskDecisionGrpcService(orderStub, new SimplePolicyEngine(),
+        mock(RiskDecisionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
 
     String riskName = InProcessServerBuilder.generateName();
     riskServer = InProcessServerBuilder.forName(riskName).directExecutor()

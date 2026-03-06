@@ -3,9 +3,15 @@ package com.autotrading.services.monitoring.api;
 import com.autotrading.services.monitoring.core.IngressForwarder;
 import com.autotrading.services.monitoring.core.MonitoringTradingMode;
 import com.autotrading.services.monitoring.core.SystemControlState;
+import com.autotrading.services.monitoring.db.SystemControlEntity;
+import com.autotrading.services.monitoring.db.SystemControlRepository;
+import com.autotrading.services.monitoring.kafka.AlertEventConsumer;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,11 +26,20 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @RequestMapping("/api/v1")
 public class MonitoringController {
+
+  private static final Logger log = LoggerFactory.getLogger(MonitoringController.class);
+
   private final IngressForwarder ingressForwarder;
+  private final SystemControlRepository systemControlRepository;
+  private final AlertEventConsumer alertEventConsumer;
   private final AtomicReference<SystemControlState> controls = new AtomicReference<>(SystemControlState.initial());
 
-  public MonitoringController(IngressForwarder ingressForwarder) {
+  public MonitoringController(IngressForwarder ingressForwarder,
+                               SystemControlRepository systemControlRepository,
+                               AlertEventConsumer alertEventConsumer) {
     this.ingressForwarder = ingressForwarder;
+    this.systemControlRepository = systemControlRepository;
+    this.alertEventConsumer = alertEventConsumer;
   }
 
   @PostMapping("/trade-events/manual")
@@ -67,8 +82,14 @@ public class MonitoringController {
       @RequestBody Map<String, Object> body) {
     boolean enabled = Boolean.parseBoolean(String.valueOf(body.getOrDefault("enabled", false)));
     MonitoringTradingMode mode = enabled ? MonitoringTradingMode.FROZEN : controls.get().tradingMode();
-    controls.set(new SystemControlState(enabled, mode, Instant.now(), actorId, requestId));
-    return Map.of("trace_id", "trc-" + requestId, "data", Map.of("kill_switch", enabled ? "ON" : "OFF", "trading_mode", mode.name()));
+    Instant now = Instant.now();
+    controls.set(new SystemControlState(enabled, mode, now, actorId, requestId));
+
+    persistControl("KILL_SWITCH", enabled ? "ON" : "OFF", actorId, requestId, now);
+    log.info("kill-switch set to {} by actorId={}", enabled ? "ON" : "OFF", actorId);
+
+    return Map.of("trace_id", "trc-" + requestId, "data",
+        Map.of("kill_switch", enabled ? "ON" : "OFF", "trading_mode", mode.name()));
   }
 
   @PostMapping("/system/trading-mode")
@@ -76,9 +97,15 @@ public class MonitoringController {
       @RequestHeader("X-Actor-Id") String actorId,
       @RequestHeader("X-Request-Id") String requestId,
       @RequestBody Map<String, Object> body) {
-    MonitoringTradingMode mode = MonitoringTradingMode.valueOf(String.valueOf(body.getOrDefault("trading_mode", "NORMAL")));
+    MonitoringTradingMode mode = MonitoringTradingMode.valueOf(
+        String.valueOf(body.getOrDefault("trading_mode", "NORMAL")));
     SystemControlState current = controls.get();
-    controls.set(new SystemControlState(current.killSwitch(), mode, Instant.now(), actorId, requestId));
+    Instant now = Instant.now();
+    controls.set(new SystemControlState(current.killSwitch(), mode, now, actorId, requestId));
+
+    persistControl("TRADING_MODE", mode.name(), actorId, requestId, now);
+    log.info("trading mode set to {} by actorId={}", mode, actorId);
+
     return Map.of("trace_id", "trc-" + requestId, "data", Map.of("trading_mode", mode.name()));
   }
 
@@ -87,6 +114,15 @@ public class MonitoringController {
     SseEmitter emitter = new SseEmitter(30_000L);
     try {
       emitter.send(SseEmitter.event().name("system.health").data(Map.of("status", "UP", "at", Instant.now().toString())));
+      List<AlertEventConsumer.AlertEvent> alerts = alertEventConsumer.getRecentAlerts();
+      if (!alerts.isEmpty()) {
+        AlertEventConsumer.AlertEvent last = alerts.get(alerts.size() - 1);
+        emitter.send(SseEmitter.event().name("system.alert").data(Map.of(
+            "severity", last.severity(),
+            "message", last.message(),
+            "source", last.source(),
+            "at", last.receivedAt().toString())));
+      }
       emitter.complete();
     } catch (Exception ex) {
       emitter.completeWithError(ex);
@@ -94,8 +130,33 @@ public class MonitoringController {
     return emitter;
   }
 
+  @GetMapping("/system/alerts")
+  public Map<String, Object> recentAlerts() {
+    return Map.of("alerts", alertEventConsumer.getRecentAlerts().stream()
+        .map(a -> Map.of(
+            "severity", a.severity(),
+            "message", a.message(),
+            "source", a.source(),
+            "receivedAt", a.receivedAt().toString()))
+        .toList());
+  }
+
   @GetMapping("/system/reconciliation/{runId}")
   public Map<String, Object> reconciliationRun(@PathVariable String runId) {
     return Map.of("run_id", runId, "status", "CLEAN", "mismatches", 0);
+  }
+
+  private void persistControl(String key, String value, String actorId, String traceId, Instant now) {
+    try {
+      SystemControlEntity entity = systemControlRepository.findById(key)
+          .orElseGet(() -> new SystemControlEntity(key, value, actorId, traceId, now));
+      entity.setControlValue(value);
+      entity.setActorId(actorId);
+      entity.setTraceId(traceId);
+      entity.setUpdatedAt(now);
+      systemControlRepository.save(entity);
+    } catch (Exception e) {
+      log.warn("monitoring failed to persist system control key={} cause={}", key, e.getMessage(), e);
+    }
   }
 }

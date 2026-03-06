@@ -1,20 +1,29 @@
 package com.autotrading.services.risk.runtime;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.command.v1.OrderCommandServiceGrpc;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
+import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
+import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(basePackages = "com.autotrading.services.risk.db")
+@EntityScan(basePackages = "com.autotrading.services.risk.db")
 public class RiskRuntimeConfiguration {
 
   @Bean
@@ -42,8 +51,12 @@ public class RiskRuntimeConfiguration {
   @Bean
   RiskDecisionGrpcService riskDecisionGrpcService(
       OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub,
-      SimplePolicyEngine policyEngine) {
-    return new RiskDecisionGrpcService(orderStub, policyEngine);
+      SimplePolicyEngine policyEngine,
+      RiskDecisionRepository riskDecisionRepository,
+      OutboxRepository outboxRepository,
+      ObjectMapper objectMapper) {
+    return new RiskDecisionGrpcService(orderStub, policyEngine, riskDecisionRepository,
+        outboxRepository, objectMapper);
   }
 
   @Bean
@@ -54,3 +67,4 @@ public class RiskRuntimeConfiguration {
     return new RiskGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }
+

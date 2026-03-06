@@ -3,6 +3,10 @@ package com.autotrading.services.order;
 import java.time.Clock;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
 import org.junit.jupiter.api.Test;
 
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
@@ -13,7 +17,10 @@ class OrderTimeoutWatchdogLifecycleTest {
 
     private final ReliabilityMetrics metrics = new ReliabilityMetrics();
     private final Clock clock = Clock.systemUTC();
-    private final OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+    private final OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+            new InMemoryIdempotencyService(),
+            mock(OrderIntentRepository.class),
+            mock(OrderLedgerRepository.class));
 
     @Test
     void isNotRunningBeforeStart() {

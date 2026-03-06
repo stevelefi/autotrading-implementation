@@ -34,6 +34,23 @@ services:
       timeout: 10s
       retries: 10
 
+  flyway-init:
+    image: flyway/flyway:10
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      FLYWAY_USER: ${POSTGRES_USER}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      FLYWAY_BASELINE_ON_MIGRATE: "true"
+      FLYWAY_VALIDATE_ON_MIGRATE: "true"
+    volumes:
+      - ../../db/migrations:/flyway/sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   redpanda-init:
     image: redpandadata/redpanda:v24.1.8
     depends_on:
@@ -150,6 +167,10 @@ services:
       GRPC_SERVER_PORT: 9093
       IBKR_MODE: SIMULATOR
       IBKR_SIMULATOR_BASE_URL: http://ibkr-simulator:8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: ibkr-connector-service
       OTEL_TRACES_EXPORTER: otlp
@@ -185,6 +206,10 @@ services:
       GRPC_SERVER_PORT: 9092
       BROKER_GRPC_HOST: ibkr-connector-service
       BROKER_GRPC_PORT: 9093
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: order-service
       OTEL_TRACES_EXPORTER: otlp
@@ -220,6 +245,10 @@ services:
       GRPC_SERVER_PORT: 9091
       ORDER_GRPC_HOST: order-service
       ORDER_GRPC_PORT: 9092
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: risk-service
       OTEL_TRACES_EXPORTER: otlp
@@ -252,9 +281,9 @@ services:
       dockerfile: services/ingress-gateway-service/Dockerfile
     environment:
       SERVER_PORT: 8080
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: ingress-gateway-service
@@ -285,6 +314,9 @@ services:
       dockerfile: services/event-processor-service/Dockerfile
     environment:
       SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: event-processor-service
@@ -315,6 +347,11 @@ services:
       dockerfile: services/agent-runtime-service/Dockerfile
     environment:
       SERVER_PORT: 8080
+      RISK_GRPC_HOST: risk-service
+      RISK_GRPC_PORT: 9091
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: agent-runtime-service
@@ -347,6 +384,9 @@ services:
       dockerfile: services/performance-service/Dockerfile
     environment:
       SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: performance-service
@@ -377,6 +417,9 @@ services:
       dockerfile: services/monitoring-api/Dockerfile
     environment:
       SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
       OTEL_SERVICE_NAME: monitoring-api

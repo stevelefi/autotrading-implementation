@@ -1,5 +1,16 @@
 package com.autotrading.services.order.core;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.command.v1.CommandStatus;
 import com.autotrading.command.v1.CreateOrderIntentRequest;
@@ -9,18 +20,19 @@ import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.libs.idempotency.ClaimOutcome;
 import com.autotrading.libs.idempotency.ClaimResult;
 import com.autotrading.libs.idempotency.IdempotencyClaim;
-import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.idempotency.IdempotencyService;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
-import java.time.Clock;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import com.autotrading.services.order.db.OrderIntentEntity;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerEntity;
+import com.autotrading.services.order.db.OrderLedgerRepository;
 
 public class OrderSafetyEngine {
-  private final InMemoryIdempotencyService idempotencyService = new InMemoryIdempotencyService();
+  private static final Logger log = LoggerFactory.getLogger(OrderSafetyEngine.class);
+
+  private final IdempotencyService idempotencyService;
+  private final OrderIntentRepository orderIntentRepository;
+  private final OrderLedgerRepository orderLedgerRepository;
   private final Map<String, OrderIntentState> ordersById = new ConcurrentHashMap<>();
   private final Map<String, String> orderIdByKey = new ConcurrentHashMap<>();
   private final List<String> alertEvents = new ArrayList<>();
@@ -28,9 +40,15 @@ public class OrderSafetyEngine {
   private final Clock clock;
   private volatile TradingMode tradingMode = TradingMode.NORMAL;
 
-  public OrderSafetyEngine(ReliabilityMetrics metrics, Clock clock) {
+  public OrderSafetyEngine(ReliabilityMetrics metrics, Clock clock,
+                           IdempotencyService idempotencyService,
+                           OrderIntentRepository orderIntentRepository,
+                           OrderLedgerRepository orderLedgerRepository) {
     this.metrics = metrics;
     this.clock = clock;
+    this.idempotencyService = idempotencyService;
+    this.orderIntentRepository = orderIntentRepository;
+    this.orderLedgerRepository = orderLedgerRepository;
   }
 
   public CreateOrderIntentResponse createOrderIntent(CreateOrderIntentRequest request,
@@ -104,6 +122,27 @@ public class OrderSafetyEngine {
     orderIdByKey.put(key, orderIntentId);
     idempotencyService.markCompleted(key, orderIntentId);
 
+    // Persist to DB (best-effort, non-blocking to safety engine in-memory state)
+    try {
+      orderIntentRepository.save(new OrderIntentEntity(
+          orderIntentId,
+          request.getSignalId().isBlank() ? null : request.getSignalId(),
+          request.getAgentId(),
+          request.getInstrumentId().isBlank() ? null : request.getInstrumentId(),
+          key,
+          request.getSide(),
+          (int) request.getQty(),
+          request.getOrderType(),
+          request.getTimeInForce(),
+          deadline,
+          now));
+      orderLedgerRepository.save(new OrderLedgerEntity(
+          orderIntentId, "SUBMIT_REQUESTED", 1L, deadline, now, now));
+      log.info("order-service persisted orderIntentId={} agentId={}", orderIntentId, request.getAgentId());
+    } catch (Exception dbEx) {
+      log.warn("order-service DB persist failed orderIntentId={} cause={}", orderIntentId, dbEx.getMessage(), dbEx);
+    }
+
     return CreateOrderIntentResponse.newBuilder()
         .setTraceId(request.getRequestContext().getTraceId())
         .setStatus(CommandStatus.COMMAND_STATUS_ACCEPTED)
@@ -152,7 +191,6 @@ public class OrderSafetyEngine {
     ordersById.clear();
     orderIdByKey.clear();
     alertEvents.clear();
-    idempotencyService.clear();
     tradingMode = TradingMode.NORMAL;
   }
 }
