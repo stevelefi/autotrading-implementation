@@ -26,10 +26,10 @@ jobs:
         run: mvn -B test
 
       - name: Migration apply check
-        run: mvn -B -pl tests/e2e -Dtest=FlywayMigrationTest test
+        run: mvn -B -pl tests/e2e -am -Dtest=FlywayMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Compose smoke (synthetic ingress path)
-        run: mvn -B -pl tests/e2e -Dtest=VerticalSliceGrpcFlowTest test
+        run: mvn -B -pl tests/e2e -am -Dtest=VerticalSliceGrpcFlowTest -Dsurefire.failIfNoSpecifiedTests=false test
 
       - name: Verify pinned spec snapshot
         run: python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
