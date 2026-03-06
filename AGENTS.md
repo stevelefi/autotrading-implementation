@@ -27,6 +27,7 @@ Before writing code, agents must:
 1. Run `tools/spec_sync.py sync` using `repo_url` and `ref` from `SPEC_VERSION.json`.
 2. `python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`.
 3. Run repo-specific tests/lints.
+4. Confirm no `specs/**` files are staged (spec sync artifacts are local-only).
 
 ## Change Control
 1. Any contract change starts in spec repo, not here.

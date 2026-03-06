@@ -48,7 +48,7 @@ tmp/
 Thumbs.db
 
 # Pulled spec artifacts (generated via tools/spec_sync.py)
-specs/vendor/
+specs/
 
 # Generated local smoke evidence artifacts
 reports/blitz/e2e-results/smoke-local-*.md

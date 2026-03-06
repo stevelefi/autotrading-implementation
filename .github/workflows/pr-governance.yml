@@ -3,13 +3,17 @@ name: pr-governance
 on:
   pull_request:
     branches: ["main"]
+    types: [opened, reopened, synchronize, edited, labeled]
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   pr-governance:
     runs-on: ubuntu-latest
+    if: github.event.action != 'labeled'
     steps:
       - name: Validate branch naming and issue link
         env:
@@ -27,3 +31,30 @@ jobs:
             echo "PR body must include an issue link like: Closes #123"
             exit 1
           fi
+
+  blocked-escalation:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'labeled' && github.event.label.name == 'blocked'
+    steps:
+      - name: Add escalation comment for blocked PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const body = [
+              "Blocked escalation triggered.",
+              "",
+              `PR: #${pr.number}`,
+              "Required next actions:",
+              "1. Identify blocker owner and dependency.",
+              "2. Add unblock plan with ETA in this thread.",
+              "3. Keep `blocked` label until unblock evidence is posted.",
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr.number,
+              body,
+            });
