@@ -2,12 +2,12 @@
 - What changed and why.
 
 ## Linked Issue
-- Closes #4
+- Closes #<issue-number>
 
 ## Spec Baseline
-- Pinned ref: spec-v1.0.1-m0m1
+- Pinned ref: `spec-v1.0.1-m0m1`
 - Verify command run:
-  - [ ] \
+  - [ ] `python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`
 
 ## Acceptance Criteria
 - [ ] All issue acceptance criteria addressed
