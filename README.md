@@ -5,7 +5,7 @@ Implementation monorepo for trading services, reliability libraries, and databas
 ## Spec Baseline
 - Spec repo: https://github.com/stevelefi/autotrading.git
 - Pinned ref: spec-v1.0.1-m0m1
-- Vendored path: specs/vendor/docs
+- Local sync path (generated, gitignored): specs/vendor/docs
 
 ## Commands
 

@@ -1,10 +1,11 @@
 # AGENTS.md
 
 ## Required Pre-Implementation Read Path
-Before writing code, agents must read:
-1. `specs/vendor/docs/contracts/**`
-2. `specs/vendor/docs/source-of-truth/**`
-3. Relevant service docs under `specs/vendor/docs/`
+Before writing code, agents must:
+1. Sync pinned spec docs from `SPEC_VERSION.json` into `specs/vendor`.
+2. Read `specs/vendor/docs/contracts/**`.
+3. Read `specs/vendor/docs/source-of-truth/**`.
+4. Read relevant service docs under `specs/vendor/docs/`.
 
 ## Spec Pinning Guardrail
 1. `SPEC_VERSION.json` is authoritative for spec baseline.
@@ -22,8 +23,9 @@ Before writing code, agents must read:
 3. PR must include acceptance checklist and evidence links.
 
 ## Required Local Checks Before Commit
-1. `python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`
-2. Run repo-specific tests/lints.
+1. Run `tools/spec_sync.py sync` using `repo_url` and `ref` from `SPEC_VERSION.json`.
+2. `python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`.
+3. Run repo-specific tests/lints.
 
 ## Change Control
 1. Any contract change starts in spec repo, not here.
