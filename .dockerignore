@@ -1,0 +1,8 @@
+.git/
+**/target/
+specs/vendor/
+reports/blitz/e2e-results/
+reports/blitz/drill-logs/
+.env
+.env.local
+**/.DS_Store

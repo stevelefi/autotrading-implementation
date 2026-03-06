@@ -9,6 +9,26 @@ __pycache__/
 .ruff_cache/
 .venv/
 
+# Java / JVM
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.classpath
+.project
+.settings/
+.gradle/
+out/
+
+# IDEs / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
 # Local env
 .env.local
 .env
@@ -17,8 +37,19 @@ __pycache__/
 !**/.env.example
 !**/.env.*.example
 
+# Logs and temporary artifacts
+*.log
+logs/
+tmp/
+*.tmp
+
 # OS
 .DS_Store
+Thumbs.db
 
 # Pulled spec artifacts (generated via tools/spec_sync.py)
 specs/vendor/
+
+# Generated local smoke evidence artifacts
+reports/blitz/e2e-results/smoke-local-*.md
+reports/blitz/drill-logs/smoke-local-*.json

@@ -1,0 +1,233 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redpanda:
+    image: redpandadata/redpanda:v24.1.8
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=1G
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:${KAFKA_PORT},OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:${KAFKA_PORT},OUTSIDE://localhost:${KAFKA_PORT}
+    ports:
+      - "${KAFKA_PORT}:19092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q Healthy"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  redpanda-console:
+    image: redpandadata/console:v2.8.10
+    environment:
+      KAFKA_BROKERS: redpanda:${KAFKA_PORT}
+    ports:
+      - "${REDPANDA_CONSOLE_PORT}:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  ibkr-simulator:
+    image: wiremock/wiremock:3.13.2
+    command: ["--global-response-templating", "--verbose"]
+    ports:
+      - "${IBKR_SIM_PORT}:8080"
+
+  ibkr-connector-service:
+    build:
+      context: ../..
+      dockerfile: services/ibkr-connector-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      GRPC_SERVER_PORT: 9093
+      IBKR_MODE: SIMULATOR
+      IBKR_SIMULATOR_BASE_URL: http://ibkr-simulator:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      ibkr-simulator:
+        condition: service_started
+    ports:
+      - "18083:8080"
+      - "19093:9093"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  order-service:
+    build:
+      context: ../..
+      dockerfile: services/order-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      GRPC_SERVER_PORT: 9092
+      BROKER_GRPC_HOST: ibkr-connector-service
+      BROKER_GRPC_PORT: 9093
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      ibkr-connector-service:
+        condition: service_healthy
+    ports:
+      - "18082:8080"
+      - "19092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  risk-service:
+    build:
+      context: ../..
+      dockerfile: services/risk-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      GRPC_SERVER_PORT: 9091
+      ORDER_GRPC_HOST: order-service
+      ORDER_GRPC_PORT: 9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    ports:
+      - "18081:8080"
+      - "19091:9091"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  ingress-gateway-service:
+    build:
+      context: ../..
+      dockerfile: services/ingress-gateway-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    ports:
+      - "18080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  event-processor-service:
+    build:
+      context: ../..
+      dockerfile: services/event-processor-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      ingress-gateway-service:
+        condition: service_healthy
+    ports:
+      - "18085:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  agent-runtime-service:
+    build:
+      context: ../..
+      dockerfile: services/agent-runtime-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      event-processor-service:
+        condition: service_healthy
+      risk-service:
+        condition: service_healthy
+    ports:
+      - "18086:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  performance-service:
+    build:
+      context: ../..
+      dockerfile: services/performance-service/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      ibkr-connector-service:
+        condition: service_healthy
+    ports:
+      - "18087:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  monitoring-api:
+    build:
+      context: ../..
+      dockerfile: services/monitoring-api/Dockerfile
+    environment:
+      SERVER_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:${KAFKA_PORT}
+    depends_on:
+      risk-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      ingress-gateway-service:
+        condition: service_healthy
+    ports:
+      - "18084:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20

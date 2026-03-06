@@ -1,0 +1,6 @@
+apiVersion: v2
+name: trading-service
+description: Baseline chart for paper vertical-slice services
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
