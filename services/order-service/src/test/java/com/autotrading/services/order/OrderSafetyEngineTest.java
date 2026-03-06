@@ -80,6 +80,65 @@ class OrderSafetyEngineTest {
     assertThat(submitCount.get()).isEqualTo(1);
   }
 
+  @Test
+  void deniedDecisionIsRejectedWithoutBrokerSubmit() throws IOException {
+    AtomicInteger submitCount = new AtomicInteger();
+    BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub = startBroker(submitCount);
+
+    ReliabilityMetrics metrics = new ReliabilityMetrics();
+    Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+
+    CreateOrderIntentRequest deniedRequest = baseRequest("idem-denied").toBuilder()
+        .setDecision(Decision.DECISION_DENY)
+        .build();
+    var denied = engine.createOrderIntent(deniedRequest, brokerStub);
+
+    assertThat(denied.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_REJECTED);
+    assertThat(denied.getReasonsList()).containsExactly("risk denied");
+    assertThat(submitCount.get()).isZero();
+  }
+
+  @Test
+  void brokerStatusAckPreventsTimeoutFreeze() throws IOException {
+    AtomicInteger submitCount = new AtomicInteger();
+    BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub = startBroker(submitCount);
+
+    ReliabilityMetrics metrics = new ReliabilityMetrics();
+    Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+
+    var created = engine.createOrderIntent(baseRequest("idem-ack"), brokerStub);
+    engine.onBrokerStatus(created.getOrderIntentId());
+    int timeoutCount = engine.runTimeoutWatchdog(Instant.parse("2026-03-06T00:02:00Z"));
+
+    assertThat(timeoutCount).isZero();
+    assertThat(engine.currentTradingMode()).isEqualTo(TradingMode.NORMAL);
+    assertThat(engine.getOrder(created.getOrderIntentId()).lifecycleState()).isEqualTo(OrderLifecycleState.SUBMITTED_ACKED);
+    assertThat(metrics.firstStatusTimeoutCount()).isZero();
+    assertThat(submitCount.get()).isEqualTo(1);
+  }
+
+  @Test
+  void idempotencyConflictRejectsSecondRequestWithDifferentPayload() throws IOException {
+    AtomicInteger submitCount = new AtomicInteger();
+    BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub = startBroker(submitCount);
+
+    ReliabilityMetrics metrics = new ReliabilityMetrics();
+    Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock);
+
+    CreateOrderIntentRequest first = baseRequest("idem-conflict");
+    CreateOrderIntentRequest conflicting = first.toBuilder().setQty(999).build();
+    var accepted = engine.createOrderIntent(first, brokerStub);
+    var rejected = engine.createOrderIntent(conflicting, brokerStub);
+
+    assertThat(accepted.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_ACCEPTED);
+    assertThat(rejected.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_REJECTED);
+    assertThat(rejected.getReasonsList()).containsExactly("idempotency conflict");
+    assertThat(submitCount.get()).isEqualTo(1);
+  }
+
   private BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub startBroker(AtomicInteger submitCount) throws IOException {
     String serverName = InProcessServerBuilder.generateName();
     server = InProcessServerBuilder.forName(serverName)

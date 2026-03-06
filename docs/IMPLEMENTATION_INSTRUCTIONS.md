@@ -30,14 +30,47 @@ This document defines the production-standard workflow for implementing and ship
 ## 4. Required Local Validation Before Commit
 1. `python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`
 2. `mvn -B test`
-3. `helm lint infra/helm/charts/trading-service`
-4. `helm template trading-service infra/helm/charts/trading-service -f infra/helm/charts/trading-service/values.yaml`
-5. Optional local config check:
+3. `make test-coverage-core` (core line coverage gate for reliability path modules)
+4. `helm lint infra/helm/charts/trading-service`
+5. `helm template trading-service infra/helm/charts/trading-service -f infra/helm/charts/trading-service/values.yaml`
+6. Optional local config check:
    - `docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml config`
-6. Runtime smoke sequence (required for runtime-touching changes):
+7. Runtime smoke sequence (required for runtime-touching changes):
    - `make up`
    - `make smoke-local`
    - `make down`
+
+## 4.1 Nightly Containerized E2E
+1. Workflow: `.github/workflows/nightly-compose-smoke.yml`
+2. Runs daily and on manual dispatch.
+3. Must execute:
+   - `make up`
+   - `make smoke-local`
+   - `make down`
+4. Upload smoke evidence artifacts from:
+   - `reports/blitz/e2e-results/smoke-local-*.md`
+   - `reports/blitz/drill-logs/smoke-local-*.json`
+   - `reports/blitz/observability-results/*.json`
+   - `reports/blitz/observability-results/*.log`
+
+## 4.2 Observability Dev Flow (OSS-First)
+1. Local stack runs via `infra/local/docker-compose.yml` with:
+   - `otel-collector`
+   - `prometheus`
+   - `loki`
+   - `promtail`
+   - `grafana`
+2. Service-level requirements:
+   - expose `prometheus` actuator endpoint
+   - emit structured logs containing `trace_id`, `request_id`, `idempotency_key`, `principal_id`
+   - propagate correlation context for inbound HTTP and gRPC
+3. Reliability telemetry expected in dashboards and alerts:
+   - `autotrading_reliability_outbox_backlog_age_ms`
+   - `autotrading_reliability_duplicate_suppression_count`
+   - `autotrading_reliability_first_status_timeout_count`
+4. Vendor handoff model:
+   - keep OpenTelemetry collector as control plane
+   - add Datadog/Splunk exporters in collector config without app rewrites
 
 ## 5. Reliability and Safety Expectations
 1. Idempotency behavior:
@@ -62,3 +95,5 @@ When implementation changes behavior, update:
 - include generated smoke report paths from:
   - `reports/blitz/e2e-results/smoke-local-*.md`
   - `reports/blitz/drill-logs/smoke-local-*.json`
+  - `reports/blitz/observability-results/*.json`
+  - `reports/blitz/observability-results/*.log`

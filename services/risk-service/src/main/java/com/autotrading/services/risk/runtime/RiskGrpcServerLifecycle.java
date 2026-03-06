@@ -2,6 +2,8 @@ package com.autotrading.services.risk.runtime;
 
 import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
 import io.grpc.Server;
+import io.grpc.ServerInterceptor;
+import io.grpc.ServerInterceptors;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -12,12 +14,14 @@ public class RiskGrpcServerLifecycle implements SmartLifecycle {
   private static final Logger log = LoggerFactory.getLogger(RiskGrpcServerLifecycle.class);
 
   private final RiskDecisionGrpcService service;
+  private final ServerInterceptor correlationInterceptor;
   private final int port;
   private volatile boolean running;
   private Server server;
 
-  public RiskGrpcServerLifecycle(RiskDecisionGrpcService service, int port) {
+  public RiskGrpcServerLifecycle(RiskDecisionGrpcService service, ServerInterceptor correlationInterceptor, int port) {
     this.service = service;
+    this.correlationInterceptor = correlationInterceptor;
     this.port = port;
   }
 
@@ -27,7 +31,10 @@ public class RiskGrpcServerLifecycle implements SmartLifecycle {
       return;
     }
     try {
-      server = NettyServerBuilder.forPort(port).addService(service).build().start();
+      server = NettyServerBuilder.forPort(port)
+          .addService(ServerInterceptors.intercept(service, correlationInterceptor))
+          .build()
+          .start();
       running = true;
       log.info("risk gRPC server started on {}", port);
     } catch (IOException ex) {

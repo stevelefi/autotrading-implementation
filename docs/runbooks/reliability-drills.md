@@ -28,6 +28,18 @@
    - trading mode `FROZEN`
    - critical timeout alert event.
 
+## Observability Validation
+When stack is up, verify:
+1. Prometheus target health: `http://localhost:9090/targets`
+2. Grafana data sources/dashboards: `http://localhost:3000`
+3. Reliability metrics queries:
+   - `sum(autotrading_reliability_first_status_timeout_count)`
+   - `max(autotrading_reliability_outbox_backlog_age_ms)`
+   - `sum(autotrading_reliability_duplicate_suppression_count)`
+4. Alert conditions defined in `infra/observability/prometheus/alerts.yml` evaluate without rule errors.
+
 ## Evidence Artifacts
 - `reports/blitz/e2e-results/smoke-local-<timestamp>.md`
 - `reports/blitz/drill-logs/smoke-local-<timestamp>.json`
+- `reports/blitz/observability-results/*.json`
+- `reports/blitz/observability-results/*.log`

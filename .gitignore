@@ -53,3 +53,5 @@ specs/vendor/
 # Generated local smoke evidence artifacts
 reports/blitz/e2e-results/smoke-local-*.md
 reports/blitz/drill-logs/smoke-local-*.json
+reports/blitz/observability-results/*.json
+reports/blitz/observability-results/*.log

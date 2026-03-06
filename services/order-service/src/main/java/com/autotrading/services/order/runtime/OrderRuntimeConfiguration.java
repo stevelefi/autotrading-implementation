@@ -1,9 +1,11 @@
 package com.autotrading.services.order.runtime;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
+import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.core.OrderSafetyEngine;
 import com.autotrading.services.order.grpc.OrderCommandGrpcService;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.time.Clock;
@@ -15,8 +17,8 @@ import org.springframework.context.annotation.Configuration;
 public class OrderRuntimeConfiguration {
 
   @Bean
-  ReliabilityMetrics reliabilityMetrics() {
-    return new ReliabilityMetrics();
+  ReliabilityMetrics reliabilityMetrics(MeterRegistry meterRegistry) {
+    return new ReliabilityMetrics(meterRegistry);
   }
 
   @Bean
@@ -51,7 +53,8 @@ public class OrderRuntimeConfiguration {
   @Bean
   OrderGrpcServerLifecycle orderGrpcServerLifecycle(
       OrderCommandGrpcService grpcService,
+      GrpcCorrelationServerInterceptor correlationInterceptor,
       @Value("${grpc.server.port:9092}") int grpcPort) {
-    return new OrderGrpcServerLifecycle(grpcService, grpcPort);
+    return new OrderGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }

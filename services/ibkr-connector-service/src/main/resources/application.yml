@@ -1,6 +1,10 @@
 server:
   port: ${SERVER_PORT:8080}
 
+spring:
+  application:
+    name: ibkr-connector-service
+
 grpc:
   server:
     port: ${GRPC_SERVER_PORT:9093}
@@ -13,9 +17,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   health:
     livenessstate:
       enabled: true
     readinessstate:
       enabled: true
+  metrics:
+    tags:
+      service: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%5p service=${spring.application.name} trace_id=%X{trace_id:-} request_id=%X{request_id:-} idempotency_key=%X{idempotency_key:-} principal_id=%X{principal_id:-} [%thread] %logger - %msg%n"

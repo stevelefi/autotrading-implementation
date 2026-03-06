@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: up down logs test-unit test-e2e smoke-local rollback-local verify-spec
+.PHONY: up down logs test-unit test-e2e test-coverage-core smoke-local rollback-local verify-spec
 
 up:
 	docker compose --env-file infra/local/.env.compose.example -f infra/local/docker-compose.yml up -d --remove-orphans
@@ -16,6 +16,9 @@ test-unit:
 
 test-e2e:
 	mvn -B -pl tests/e2e -am test
+
+test-coverage-core:
+	mvn -B -Pcoverage-core -pl libs/reliability-core,services/ingress-gateway-service,services/risk-service,services/order-service,services/ibkr-connector-service -am verify
 
 smoke-local:
 	python3 scripts/smoke_local.py
