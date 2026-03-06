@@ -12,28 +12,14 @@ on:
 permissions:
   contents: read
 
+# Note: spec sync (tools/spec_sync.py) is a local-only workflow.
+# specs/vendor/ is gitignored and pulled on demand with: make verify-spec
+# It is intentionally not run in CI.
+
 jobs:
-  verify-spec:
-    name: Verify spec pin
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install spec-sync deps
-        run: pip install requests
-
-      - name: Verify pinned spec
-        run: python tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
-
   build-and-test:
     name: Build & unit test
     runs-on: ubuntu-latest
-    needs: verify-spec
     steps:
       - uses: actions/checkout@v4
 
