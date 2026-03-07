@@ -27,7 +27,6 @@ theme:
     - navigation.sections
     - navigation.indexes
     - navigation.top
-    - toc.follow
     - content.code.copy
     - content.action.edit
 
@@ -56,6 +55,9 @@ nav:
   - Observability: OBSERVABILITY.md
   - Runbooks:
     - Reliability Drills: runbooks/reliability-drills.md
+
+extra_css:
+  - assets/stylesheets/extra.css
 
 extra:
   social:

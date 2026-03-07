@@ -1,0 +1,4 @@
+/* Hide right-side TOC panel — content uses full available width */
+.md-sidebar--secondary {
+  display: none;
+}
