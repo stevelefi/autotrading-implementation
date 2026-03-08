@@ -1,48 +1,45 @@
 package com.autotrading.services.order.db;
 
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "order_intents")
+@Table("order_intents")
 public class OrderIntentEntity {
 
   @Id
-  @Column(name = "order_intent_id")
+  @Column("order_intent_id")
   private String orderIntentId;
 
-  @Column(name = "signal_id")
+  @Column("signal_id")
   private String signalId;
 
-  @Column(name = "agent_id", nullable = false)
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "instrument_id")
+  @Column("instrument_id")
   private String instrumentId;
 
-  @Column(name = "idempotency_key", nullable = false, unique = true)
+  @Column("idempotency_key")
   private String idempotencyKey;
 
-  @Column(name = "side", nullable = false)
+  @Column("side")
   private String side;
 
-  @Column(name = "qty", nullable = false)
+  @Column("qty")
   private int qty;
 
-  @Column(name = "order_type", nullable = false)
+  @Column("order_type")
   private String orderType;
 
-  @Column(name = "time_in_force", nullable = false)
+  @Column("time_in_force")
   private String timeInForce;
 
-  @Column(name = "submission_deadline", nullable = false)
+  @Column("submission_deadline")
   private Instant submissionDeadline;
 
-  @Column(name = "created_at", nullable = false)
+  @Column("created_at")
   private Instant createdAt;
 
   protected OrderIntentEntity() {}

@@ -1,29 +1,27 @@
 package com.autotrading.services.monitoring.db;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "system_controls")
+@Table("system_controls")
 public class SystemControlEntity {
 
   @Id
-  @Column(name = "control_key")
+  @Column("control_key")
   private String controlKey;
 
-  @Column(name = "control_value", nullable = false)
+  @Column("control_value")
   private String controlValue;
 
-  @Column(name = "actor_id", nullable = false)
+  @Column("actor_id")
   private String actorId;
 
-  @Column(name = "trace_id", nullable = false)
+  @Column("trace_id")
   private String traceId;
 
-  @Column(name = "updated_at", nullable = false)
+  @Column("updated_at")
   private Instant updatedAt;
 
   protected SystemControlEntity() {}

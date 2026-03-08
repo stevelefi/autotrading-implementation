@@ -1,9 +1,9 @@
 package com.autotrading.services.ingress.db;
 
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.ListCrudRepository;
 
-public interface IngressRawEventRepository extends JpaRepository<IngressRawEventEntity, String> {
+public interface IngressRawEventRepository extends ListCrudRepository<IngressRawEventEntity, String> {
 
   Optional<IngressRawEventEntity> findByIdempotencyKey(String idempotencyKey);
 

@@ -3,10 +3,8 @@ package com.autotrading.services.order.runtime;
 import java.time.Clock;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
@@ -25,8 +23,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
 @EnableTransactionManagement
-@EnableJpaRepositories(basePackages = "com.autotrading.services.order.db")
-@EntityScan(basePackages = "com.autotrading.services.order.db")
 public class OrderRuntimeConfiguration {
 
   @Bean

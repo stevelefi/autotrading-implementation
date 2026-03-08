@@ -1,10 +1,9 @@
 package com.autotrading.services.eventprocessor.db;
 
 import java.util.Optional;
+import org.springframework.data.repository.ListCrudRepository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface RoutedTradeEventRepository extends JpaRepository<RoutedTradeEventEntity, String> {
+public interface RoutedTradeEventRepository extends ListCrudRepository<RoutedTradeEventEntity, String> {
 
   Optional<RoutedTradeEventEntity> findByIngressEventId(String ingressEventId);
 

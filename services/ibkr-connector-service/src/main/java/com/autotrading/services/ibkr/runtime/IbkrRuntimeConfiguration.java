@@ -2,10 +2,8 @@ package com.autotrading.services.ibkr.runtime;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.libs.idempotency.IdempotencyService;
@@ -22,8 +20,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
 @EnableTransactionManagement
-@EnableJpaRepositories(basePackages = "com.autotrading.services.ibkr.db")
-@EntityScan(basePackages = "com.autotrading.services.ibkr.db")
 public class IbkrRuntimeConfiguration {
 
   @Bean

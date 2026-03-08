@@ -1,62 +1,57 @@
 package com.autotrading.services.ingress.db;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.Instant;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "ingress_raw_events")
+@Table("ingress_raw_events")
 public class IngressRawEventEntity {
 
   @Id
-  @Column(name = "raw_event_id")
+  @Column("raw_event_id")
   private String rawEventId;
 
-  @Column(name = "ingress_event_id", nullable = false, unique = true)
+  @Column("ingress_event_id")
   private String ingressEventId;
 
-  @Column(name = "trace_id", nullable = false)
+  @Column("trace_id")
   private String traceId;
 
-  @Column(name = "request_id", nullable = false)
+  @Column("request_id")
   private String requestId;
 
-  @Column(name = "idempotency_key", nullable = false, unique = true)
+  @Column("idempotency_key")
   private String idempotencyKey;
 
-  @Column(name = "source_type", nullable = false)
+  @Column("source_type")
   private String sourceType;
 
-  @Column(name = "source_protocol")
+  @Column("source_protocol")
   private String sourceProtocol;
 
-  @Column(name = "event_intent")
+  @Column("event_intent")
   private String eventIntent;
 
-  @Column(name = "source_event_id")
+  @Column("source_event_id")
   private String sourceEventId;
 
-  @Column(name = "agent_id")
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "integration_id")
+  @Column("integration_id")
   private String integrationId;
 
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "principal_json", columnDefinition = "jsonb")
+  @Column("principal_json")
   private String principalJson;
 
-  @Column(name = "payload_json", nullable = false, columnDefinition = "TEXT")
+  @Column("payload_json")
   private String payloadJson;
 
-  @Column(name = "ingestion_status", nullable = false)
+  @Column("ingestion_status")
   private String ingestionStatus;
 
-  @Column(name = "received_at", nullable = false)
+  @Column("received_at")
   private Instant receivedAt;
 
   protected IngressRawEventEntity() {}

@@ -1,57 +1,54 @@
 package com.autotrading.services.eventprocessor.db;
 
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "routed_trade_events")
+@Table("routed_trade_events")
 public class RoutedTradeEventEntity {
 
   @Id
-  @Column(name = "trade_event_id")
+  @Column("trade_event_id")
   private String tradeEventId;
 
-  @Column(name = "raw_event_id", nullable = false, unique = true)
+  @Column("raw_event_id")
   private String rawEventId;
 
-  @Column(name = "ingress_event_id", nullable = false)
+  @Column("ingress_event_id")
   private String ingressEventId;
 
-  @Column(name = "trace_id", nullable = false)
+  @Column("trace_id")
   private String traceId;
 
-  @Column(name = "idempotency_key", nullable = false)
+  @Column("idempotency_key")
   private String idempotencyKey;
 
-  @Column(name = "agent_id")
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "source_type", nullable = false)
+  @Column("source_type")
   private String sourceType;
 
-  @Column(name = "source_event_id")
+  @Column("source_event_id")
   private String sourceEventId;
 
-  @Column(name = "canonical_payload_json", nullable = false, columnDefinition = "TEXT")
+  @Column("canonical_payload_json")
   private String canonicalPayloadJson;
 
-  @Column(name = "instrument_id")
+  @Column("instrument_id")
   private String instrumentId;
 
-  @Column(name = "route_topic")
+  @Column("route_topic")
   private String routeTopic;
 
-  @Column(name = "routing_status")
+  @Column("routing_status")
   private String routingStatus;
 
-  @Column(name = "created_at", nullable = false)
+  @Column("created_at")
   private Instant createdAt;
 
-  @Column(name = "routed_at", nullable = false)
+  @Column("routed_at")
   private Instant routedAt;
 
   protected RoutedTradeEventEntity() {}

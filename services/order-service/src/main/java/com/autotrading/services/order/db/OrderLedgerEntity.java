@@ -1,33 +1,30 @@
 package com.autotrading.services.order.db;
 
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "order_ledger")
+@Table("order_ledger")
 public class OrderLedgerEntity {
 
   @Id
-  @Column(name = "order_intent_id")
+  @Column("order_intent_id")
   private String orderIntentId;
 
-  @Column(name = "state", nullable = false)
+  @Column("state")
   private String state;
 
-  @Column(name = "state_version", nullable = false)
+  @Column("state_version")
   private long stateVersion;
 
-  @Column(name = "submission_deadline", nullable = false)
+  @Column("submission_deadline")
   private Instant submissionDeadline;
 
-  @Column(name = "last_status_at")
+  @Column("last_status_at")
   private Instant lastStatusAt;
 
-  @Column(name = "updated_at", nullable = false)
+  @Column("updated_at")
   private Instant updatedAt;
 
   protected OrderLedgerEntity() {}
