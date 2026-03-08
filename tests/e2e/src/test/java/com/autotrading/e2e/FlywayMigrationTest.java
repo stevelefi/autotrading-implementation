@@ -1,39 +1,55 @@
 package com.autotrading.e2e;
 
+import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
+
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class FlywayMigrationTest {
 
+  static EmbeddedPostgres pg;
+
+  @BeforeAll
+  static void startDb() throws Exception {
+    pg = EmbeddedPostgres.start();
+  }
+
+  @AfterAll
+  static void stopDb() throws Exception {
+    if (pg != null) pg.close();
+  }
+
   @Test
   void appliesBaselineMigrations() throws Exception {
-    String url = "jdbc:h2:mem:autotrading;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;" +
-        "INIT=CREATE DOMAIN IF NOT EXISTS TIMESTAMPTZ AS TIMESTAMP WITH TIME ZONE\\;" +
-        "CREATE DOMAIN IF NOT EXISTS JSONB AS CLOB\\;";
-
     Flyway flyway = Flyway.configure()
-        .dataSource(url, "sa", "")
+        .dataSource(pg.getPostgresDatabase())
         .locations("filesystem:../../db/migrations")
         .load();
 
     int applied = flyway.migrate().migrationsExecuted;
     assertThat(applied).isGreaterThanOrEqualTo(1);
 
-    try (Connection conn = DriverManager.getConnection(url, "sa", "");
-         ResultSet rs = conn.createStatement().executeQuery("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='OUTBOX_EVENTS'")) {
+    try (Connection conn = pg.getPostgresDatabase().getConnection();
+         ResultSet rs = conn.createStatement().executeQuery(
+             "SELECT COUNT(*) FROM information_schema.tables"
+             + " WHERE table_schema = 'public' AND table_name = 'outbox_events'")) {
       rs.next();
       assertThat(rs.getInt(1)).isEqualTo(1);
     }
-    // V2 added NEXT_RETRY_AT column for exponential backoff
-    try (Connection conn = DriverManager.getConnection(url, "sa", "");
+
+    // V2 added NEXT_RETRY_AT column for exponential back-off
+    try (Connection conn = pg.getPostgresDatabase().getConnection();
          ResultSet rs = conn.createStatement().executeQuery(
-             "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
-             "WHERE TABLE_NAME='OUTBOX_EVENTS' AND COLUMN_NAME='NEXT_RETRY_AT'")) {
+             "SELECT COUNT(*) FROM information_schema.columns"
+             + " WHERE table_schema = 'public'"
+             + "   AND table_name = 'outbox_events'"
+             + "   AND column_name = 'next_retry_at'")) {
       rs.next();
       assertThat(rs.getInt(1)).isEqualTo(1);
     }

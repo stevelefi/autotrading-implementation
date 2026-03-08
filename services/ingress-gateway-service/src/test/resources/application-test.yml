@@ -1,15 +1,9 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_UPPER=FALSE;NON_KEYWORDS=VALUE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/autotrading}
+    username: ${SPRING_DATASOURCE_USERNAME:autotrading}
+    password: ${SPRING_DATASOURCE_PASSWORD:autotrading}
+    driver-class-name: org.postgresql.Driver
   flyway:
     enabled: false
   kafka:
