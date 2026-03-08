@@ -2,11 +2,13 @@ package com.autotrading.services.monitoring.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("system_controls")
-public class SystemControlEntity {
+public class SystemControlEntity implements Persistable<String> {
 
   @Id
   @Column("control_key")
@@ -24,6 +26,8 @@ public class SystemControlEntity {
   @Column("updated_at")
   private Instant updatedAt;
 
+  @Transient private boolean isNewEntity;
+
   protected SystemControlEntity() {}
 
   public SystemControlEntity(String controlKey, String controlValue,
@@ -33,6 +37,7 @@ public class SystemControlEntity {
     this.actorId = actorId;
     this.traceId = traceId;
     this.updatedAt = updatedAt;
+    this.isNewEntity = true;
   }
 
   public String getControlKey() { return controlKey; }
@@ -45,4 +50,7 @@ public class SystemControlEntity {
   public void setActorId(String actorId) { this.actorId = actorId; }
   public void setTraceId(String traceId) { this.traceId = traceId; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+  @Override public String getId() { return controlKey; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

@@ -2,11 +2,13 @@ package com.autotrading.services.order.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("order_intents")
-public class OrderIntentEntity {
+public class OrderIntentEntity implements Persistable<String> {
 
   @Id
   @Column("order_intent_id")
@@ -42,6 +44,8 @@ public class OrderIntentEntity {
   @Column("created_at")
   private Instant createdAt;
 
+  @Transient private boolean isNewEntity;
+
   protected OrderIntentEntity() {}
 
   public OrderIntentEntity(String orderIntentId, String signalId, String agentId,
@@ -59,6 +63,7 @@ public class OrderIntentEntity {
     this.timeInForce = timeInForce;
     this.submissionDeadline = submissionDeadline;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getOrderIntentId() { return orderIntentId; }
@@ -72,4 +77,7 @@ public class OrderIntentEntity {
   public String getTimeInForce() { return timeInForce; }
   public Instant getSubmissionDeadline() { return submissionDeadline; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return orderIntentId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

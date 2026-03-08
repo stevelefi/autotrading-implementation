@@ -3,11 +3,13 @@ package com.autotrading.services.performance.db;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("pnl_snapshots")
-public class PnlSnapshotEntity {
+public class PnlSnapshotEntity implements Persistable<String> {
 
   @Id
   @Column("snapshot_id")
@@ -40,6 +42,8 @@ public class PnlSnapshotEntity {
   @Column("created_at")
   private Instant createdAt;
 
+  @Transient private boolean isNewEntity;
+
   protected PnlSnapshotEntity() {}
 
   public PnlSnapshotEntity(String snapshotId, String agentId, String instrumentId,
@@ -55,6 +59,7 @@ public class PnlSnapshotEntity {
     this.qty = qty;
     this.avgCost = avgCost;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getSnapshotId() { return snapshotId; }
@@ -67,4 +72,7 @@ public class PnlSnapshotEntity {
   public int getQty() { return qty; }
   public BigDecimal getAvgCost() { return avgCost; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return snapshotId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

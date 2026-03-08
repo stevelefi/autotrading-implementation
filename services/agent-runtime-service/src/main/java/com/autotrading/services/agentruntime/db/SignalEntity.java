@@ -2,11 +2,13 @@ package com.autotrading.services.agentruntime.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("signals")
-public class SignalEntity {
+public class SignalEntity implements Persistable<String> {
 
   @Id
   @Column("signal_id")
@@ -42,6 +44,8 @@ public class SignalEntity {
   @Column("signal_ts")
   private Instant signalTs;
 
+  @Transient private boolean isNewEntity;
+
   protected SignalEntity() {}
 
   public SignalEntity(String signalId, String tradeEventId, String agentId, String instrumentId,
@@ -59,6 +63,7 @@ public class SignalEntity {
     this.originSourceEventId = originSourceEventId;
     this.rawPayloadJson = rawPayloadJson;
     this.signalTs = signalTs;
+    this.isNewEntity = true;
   }
 
   public String getSignalId() { return signalId; }
@@ -72,4 +77,7 @@ public class SignalEntity {
   public String getOriginSourceEventId() { return originSourceEventId; }
   public String getRawPayloadJson() { return rawPayloadJson; }
   public Instant getSignalTs() { return signalTs; }
+
+  @Override public String getId() { return signalId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

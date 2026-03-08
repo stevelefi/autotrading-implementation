@@ -2,11 +2,13 @@ package com.autotrading.services.risk.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("risk_decisions")
-public class RiskDecisionEntity {
+public class RiskDecisionEntity implements Persistable<String> {
 
   @Id
   @Column("risk_decision_id")
@@ -39,6 +41,8 @@ public class RiskDecisionEntity {
   @Column("created_at")
   private Instant createdAt;
 
+  @Transient private boolean isNewEntity;
+
   protected RiskDecisionEntity() {}
 
   public RiskDecisionEntity(String riskDecisionId, String signalId, String traceId,
@@ -55,6 +59,7 @@ public class RiskDecisionEntity {
     this.matchedRuleIdsJson = matchedRuleIdsJson;
     this.failureMode = failureMode;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getRiskDecisionId() { return riskDecisionId; }
@@ -67,4 +72,7 @@ public class RiskDecisionEntity {
   public String getMatchedRuleIdsJson() { return matchedRuleIdsJson; }
   public String getFailureMode() { return failureMode; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return riskDecisionId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

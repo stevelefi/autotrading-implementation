@@ -2,11 +2,13 @@ package com.autotrading.services.ibkr.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("broker_orders")
-public class BrokerOrderEntity {
+public class BrokerOrderEntity implements Persistable<String> {
 
   @Id
   @Column("broker_order_id")
@@ -45,6 +47,8 @@ public class BrokerOrderEntity {
   @Column("updated_at")
   private Instant updatedAt;
 
+  @Transient private boolean isNewEntity;
+
   protected BrokerOrderEntity() {}
 
   public BrokerOrderEntity(String brokerOrderId, String orderIntentId, String orderRef,
@@ -63,6 +67,7 @@ public class BrokerOrderEntity {
     this.status = status;
     this.submittedAt = submittedAt;
     this.updatedAt = updatedAt;
+    this.isNewEntity = true;
   }
 
   public String getBrokerOrderId() { return brokerOrderId; }
@@ -80,4 +85,7 @@ public class BrokerOrderEntity {
 
   public void setStatus(String status) { this.status = status; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+  @Override public String getId() { return brokerOrderId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

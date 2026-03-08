@@ -2,11 +2,13 @@ package com.autotrading.services.order.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("order_ledger")
-public class OrderLedgerEntity {
+public class OrderLedgerEntity implements Persistable<String> {
 
   @Id
   @Column("order_intent_id")
@@ -27,6 +29,8 @@ public class OrderLedgerEntity {
   @Column("updated_at")
   private Instant updatedAt;
 
+  @Transient private boolean isNewEntity;
+
   protected OrderLedgerEntity() {}
 
   public OrderLedgerEntity(String orderIntentId, String state, long stateVersion,
@@ -37,6 +41,7 @@ public class OrderLedgerEntity {
     this.submissionDeadline = submissionDeadline;
     this.lastStatusAt = lastStatusAt;
     this.updatedAt = updatedAt;
+    this.isNewEntity = true;
   }
 
   public String getOrderIntentId() { return orderIntentId; }
@@ -50,4 +55,7 @@ public class OrderLedgerEntity {
   public void setStateVersion(long stateVersion) { this.stateVersion = stateVersion; }
   public void setLastStatusAt(Instant lastStatusAt) { this.lastStatusAt = lastStatusAt; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+  @Override public String getId() { return orderIntentId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

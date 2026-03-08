@@ -2,11 +2,13 @@ package com.autotrading.services.eventprocessor.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("routed_trade_events")
-public class RoutedTradeEventEntity {
+public class RoutedTradeEventEntity implements Persistable<String> {
 
   @Id
   @Column("trade_event_id")
@@ -51,6 +53,8 @@ public class RoutedTradeEventEntity {
   @Column("routed_at")
   private Instant routedAt;
 
+  @Transient private boolean isNewEntity;
+
   protected RoutedTradeEventEntity() {}
 
   public RoutedTradeEventEntity(
@@ -82,6 +86,7 @@ public class RoutedTradeEventEntity {
     this.routingStatus = routingStatus;
     this.createdAt = createdAt;
     this.routedAt = routedAt;
+    this.isNewEntity = true;
   }
 
   public String getTradeEventId() { return tradeEventId; }
@@ -98,4 +103,7 @@ public class RoutedTradeEventEntity {
   public String getRoutingStatus() { return routingStatus; }
   public Instant getCreatedAt() { return createdAt; }
   public Instant getRoutedAt() { return routedAt; }
+
+  @Override public String getId() { return tradeEventId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

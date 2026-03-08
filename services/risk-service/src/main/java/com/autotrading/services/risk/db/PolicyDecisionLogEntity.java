@@ -2,11 +2,13 @@ package com.autotrading.services.risk.db;
 
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 @Table("policy_decision_log")
-public class PolicyDecisionLogEntity {
+public class PolicyDecisionLogEntity implements Persistable<String> {
 
   @Id
   @Column("log_id")
@@ -39,6 +41,8 @@ public class PolicyDecisionLogEntity {
   @Column("created_at")
   private Instant createdAt;
 
+  @Transient private boolean isNewEntity;
+
   protected PolicyDecisionLogEntity() {}
 
   public PolicyDecisionLogEntity(String logId, String riskDecisionId, String traceId,
@@ -55,6 +59,7 @@ public class PolicyDecisionLogEntity {
     this.policyRuleSet = policyRuleSet;
     this.latencyMs = latencyMs;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getLogId() { return logId; }
@@ -67,4 +72,7 @@ public class PolicyDecisionLogEntity {
   public String getPolicyRuleSet() { return policyRuleSet; }
   public Long getLatencyMs() { return latencyMs; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return logId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

@@ -3,6 +3,8 @@ package com.autotrading.services.ibkr.db;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -12,7 +14,7 @@ import org.springframework.data.relational.core.mapping.Table;
  * The {@code exec_id} is globally unique and provides fill-level idempotency.
  */
 @Table("executions")
-public class ExecutionEntity {
+public class ExecutionEntity implements Persistable<String> {
 
   @Id
   @Column("exec_id")
@@ -48,6 +50,8 @@ public class ExecutionEntity {
   @Column("created_at")
   private Instant createdAt;
 
+  @Transient private boolean isNewEntity;
+
   protected ExecutionEntity() {}
 
   public ExecutionEntity(String execId, String orderIntentId, String brokerOrderId,
@@ -65,6 +69,7 @@ public class ExecutionEntity {
     this.commission = commission;
     this.fillTs = fillTs;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getExecId() { return execId; }
@@ -78,4 +83,7 @@ public class ExecutionEntity {
   public BigDecimal getCommission() { return commission; }
   public Instant getFillTs() { return fillTs; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return execId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }
