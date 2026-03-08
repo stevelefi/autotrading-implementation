@@ -13,22 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  # ── Required branch-protection checks (no-op — managed locally) ────────────
-  # verify-spec: spec sync is a local-only gate (make verify-spec / make pre-commit).
-  #   specs/vendor/ is gitignored and never committed. Not a CI concern.
-  # pr-governance: governance checks run locally via pre-commit + PR template.
-  verify-spec:
-    name: Verify spec pin
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Spec sync is enforced locally via make verify-spec. Skipped in CI."
-
-  pr-governance:
-    name: PR governance
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "PR governance is enforced via PR template and local pre-commit. Skipped in CI."
-
   # ── Java: build + test + coverage — single job, single Maven cache restore ──
   # Consolidating build-and-test / build-libs / coverage-core into one job
   # eliminates 2 extra runner startups and 2 extra cache restorations per run.
