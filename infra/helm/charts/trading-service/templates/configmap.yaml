@@ -5,3 +5,4 @@ metadata:
 data:
   SPRING_PROFILES_ACTIVE: {{ .Values.env.SPRING_PROFILES_ACTIVE | quote }}
   KAFKA_BOOTSTRAP_SERVERS: {{ .Values.env.KAFKA_BOOTSTRAP_SERVERS | quote }}
+  QA_API_ENABLED: {{ .Values.qa.api.enabled | quote }}

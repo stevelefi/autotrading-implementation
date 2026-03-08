@@ -22,3 +22,8 @@ resources:
   requests:
     cpu: "100m"
     memory: "128Mi"
+
+# Internal QA automation API — disabled by default; enable only in dedicated QA environments
+qa:
+  api:
+    enabled: false
