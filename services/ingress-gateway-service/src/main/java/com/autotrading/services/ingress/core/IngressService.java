@@ -1,20 +1,5 @@
 package com.autotrading.services.ingress.core;
 
-import com.autotrading.libs.commonenvelope.EventEnvelope;
-import com.autotrading.libs.commonenvelope.RequestContext;
-import com.autotrading.libs.idempotency.ClaimOutcome;
-import com.autotrading.libs.idempotency.ClaimResult;
-import com.autotrading.libs.idempotency.IdempotencyClaim;
-import com.autotrading.libs.idempotency.IdempotencyService;
-import com.autotrading.libs.reliability.outbox.OutboxEvent;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
-import com.autotrading.libs.reliability.outbox.OutboxStatus;
-import com.autotrading.services.ingress.api.IngressAcceptedResponse;
-import com.autotrading.services.ingress.api.IngressSubmitRequest;
-import com.autotrading.services.ingress.db.IngressRawEventEntity;
-import com.autotrading.services.ingress.db.IngressRawEventRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,34 +8,63 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.autotrading.libs.commonenvelope.EventEnvelope;
+import com.autotrading.libs.commonenvelope.RequestContext;
+import com.autotrading.libs.idempotency.ClaimOutcome;
+import com.autotrading.libs.idempotency.ClaimResult;
+import com.autotrading.libs.idempotency.IdempotencyClaim;
+import com.autotrading.libs.idempotency.IdempotencyService;
+import com.autotrading.libs.kafka.KafkaFirstPublisher;
+import com.autotrading.services.ingress.api.IngressAcceptedResponse;
+import com.autotrading.services.ingress.api.IngressSubmitRequest;
+import com.autotrading.services.ingress.db.IngressRawEventEntity;
+import com.autotrading.services.ingress.db.IngressRawEventRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class IngressService {
 
   private static final Logger log = LoggerFactory.getLogger(IngressService.class);
 
+  private static final String TOPIC = "ingress.events.normalized.v1";
+
   private final IdempotencyService idempotencyService;
-  private final OutboxRepository outboxRepository;
+  private final KafkaFirstPublisher kafkaFirstPublisher;
   private final IngressRawEventRepository rawEventRepository;
   private final ObjectMapper objectMapper;
 
   public IngressService(
       IdempotencyService idempotencyService,
-      OutboxRepository outboxRepository,
+      KafkaFirstPublisher kafkaFirstPublisher,
       IngressRawEventRepository rawEventRepository,
       ObjectMapper objectMapper) {
     this.idempotencyService = idempotencyService;
-    this.outboxRepository = outboxRepository;
+    this.kafkaFirstPublisher = kafkaFirstPublisher;
     this.rawEventRepository = rawEventRepository;
     this.objectMapper = objectMapper;
   }
 
+  /**
+   * Accepts an ingress event:
+   * <ol>
+   *   <li>Validates and deduplicates via idempotency key.</li>
+   *   <li>Always persists to {@code ingress_raw_events} for audit/troubleshooting.</li>
+   *   <li>After the DB transaction commits, tries to publish to Kafka immediately.</li>
+   *   <li>If Kafka is unavailable, {@link KafkaFirstPublisher} falls back to the outbox
+   *       so the background poller retries with exponential back-off.</li>
+   * </ol>
+   */
   @Transactional
   public IngressAcceptedResponse accept(
       IngressSubmitRequest request, String requestId, String authorization) {
@@ -71,7 +85,7 @@ public class IngressService {
               HttpStatus.INTERNAL_SERVER_ERROR, "idempotency replay record missing"));
     }
 
-    // New event — persist + enqueue
+    // New event — persist raw for audit, then publish to Kafka post-commit
     String rawEventId = "raw-" + UUID.randomUUID();
     String ingressEventId = "ing-" + UUID.randomUUID();
     String traceId = "trc-" + UUID.randomUUID();
@@ -91,7 +105,7 @@ public class IngressService {
 
     EventEnvelope<Map<String, Object>> envelope = new EventEnvelope<>(
         ingressEventId,
-        "ingress.events.normalized.v1",
+        TOPIC,
         1,
         now,
         new RequestContext(traceId, requestId, request.idempotency_key(),
@@ -119,17 +133,19 @@ public class IngressService {
         "ACCEPTED",
         now);
 
+    // Always persist the raw event — provides full audit trail regardless of Kafka state
     rawEventRepository.save(entity);
-
-    outboxRepository.append(new OutboxEvent(
-        UUID.randomUUID().toString(),
-        "ingress.events.normalized.v1",
-        partitionKey,
-        envelopeJson,
-        OutboxStatus.NEW,
-        0, null, now, now));
-
     idempotencyService.markCompleted(request.idempotency_key(), ingressEventId);
+
+    // Register a post-commit hook: try Kafka immediately; fall back to outbox on failure
+    final String finalPartitionKey = partitionKey;
+    final String finalEnvelopeJson = envelopeJson;
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        kafkaFirstPublisher.publish(TOPIC, finalPartitionKey, finalEnvelopeJson);
+      }
+    });
 
     log.info("ingress accepted ingressEventId={} traceId={} idempotencyKey={}",
         ingressEventId, traceId, request.idempotency_key());

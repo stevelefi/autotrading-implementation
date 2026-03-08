@@ -33,7 +33,6 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
-      retries: 3
 
 management:
   endpoint:
@@ -52,6 +51,15 @@ management:
   metrics:
     tags:
       service: ${spring.application.name}
+
+# Kafka-first outbox: enabled only in ingress-gateway-service.
+# All other services set this to false.
+autotrading:
+  kafka:
+    publish-timeout-ms: 500   # single-attempt timeout; DirectKafkaPublisher retries within 5s total
+  outbox:
+    poller:
+      enabled: true
 
 logging:
   pattern:

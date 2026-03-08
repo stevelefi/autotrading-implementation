@@ -1,10 +1,10 @@
 package com.autotrading.e2e;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +26,14 @@ class FlywayMigrationTest {
 
     try (Connection conn = DriverManager.getConnection(url, "sa", "");
          ResultSet rs = conn.createStatement().executeQuery("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='OUTBOX_EVENTS'")) {
+      rs.next();
+      assertThat(rs.getInt(1)).isEqualTo(1);
+    }
+    // V2 added NEXT_RETRY_AT column for exponential backoff
+    try (Connection conn = DriverManager.getConnection(url, "sa", "");
+         ResultSet rs = conn.createStatement().executeQuery(
+             "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
+             "WHERE TABLE_NAME='OUTBOX_EVENTS' AND COLUMN_NAME='NEXT_RETRY_AT'")) {
       rs.next();
       assertThat(rs.getInt(1)).isEqualTo(1);
     }

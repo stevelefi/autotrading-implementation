@@ -1,5 +1,6 @@
 package com.autotrading.services.ibkr.runtime;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
@@ -8,9 +9,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.libs.idempotency.IdempotencyService;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
@@ -35,9 +36,9 @@ public class IbkrRuntimeConfiguration {
       IdempotencyService idempotencyService,
       BrokerOrderRepository brokerOrderRepository,
       ExecutionRepository executionRepository,
-      OutboxRepository outboxRepository,
+      @Qualifier("bestEffortKafkaPublisher") DirectKafkaPublisher bestEffortPublisher,
       ObjectMapper objectMapper) {
-    return new BrokerConnectorEngine(idempotencyService, brokerOrderRepository, executionRepository, outboxRepository, objectMapper);
+    return new BrokerConnectorEngine(idempotencyService, brokerOrderRepository, executionRepository, bestEffortPublisher, objectMapper);
   }
 
   @Bean

@@ -9,7 +9,6 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,37 +35,40 @@ public class JdbcIdempotencyService implements IdempotencyService {
   @Override
   @Transactional
   public ClaimResult claim(IdempotencyClaim claim) {
-    try {
-      jdbc.update(
-          """
-          INSERT INTO idempotency_records
-                 (idempotency_key, payload_hash, status, created_at_utc, updated_at_utc)
-          VALUES (?,                ?,            'PENDING', ?,             ?)
-          """,
-          claim.key(),
-          claim.payloadHash(),
-          Timestamp.from(claim.claimedAtUtc()),
-          Timestamp.from(claim.claimedAtUtc()));
+    // Use ON CONFLICT DO NOTHING to avoid poisoning the current transaction with a
+    // PostgreSQL aborted-transaction state that would prevent the follow-up SELECT.
+    int inserted = jdbc.update(
+        """
+        INSERT INTO idempotency_records
+               (idempotency_key, payload_hash, status, created_at_utc, updated_at_utc)
+        VALUES (?,                ?,            'PENDING', ?,             ?)
+        ON CONFLICT (idempotency_key) DO NOTHING
+        """,
+        claim.key(),
+        claim.payloadHash(),
+        Timestamp.from(claim.claimedAtUtc()),
+        Timestamp.from(claim.claimedAtUtc()));
 
+    if (inserted == 1) {
       IdempotencyRecord rec = new IdempotencyRecord(
           claim.key(), claim.payloadHash(), IdempotencyStatus.PENDING,
           null, null, claim.claimedAtUtc());
       return new ClaimResult(ClaimOutcome.CLAIMED, rec, "claimed");
-
-    } catch (DuplicateKeyException e) {
-      Optional<IdempotencyRecord> existing = find(claim.key());
-      if (existing.isEmpty()) {
-        return new ClaimResult(ClaimOutcome.CONFLICT, null, "concurrent insert race");
-      }
-      IdempotencyRecord rec = existing.get();
-      if (!rec.payloadHash().equals(claim.payloadHash())) {
-        return new ClaimResult(ClaimOutcome.CONFLICT, rec, "payload hash mismatch");
-      }
-      if (rec.status() == IdempotencyStatus.PENDING) {
-        return new ClaimResult(ClaimOutcome.CONFLICT, rec, "in-flight duplicate");
-      }
-      return new ClaimResult(ClaimOutcome.REPLAY, rec, "replay");
     }
+
+    // Row already exists — determine the outcome from the existing record.
+    Optional<IdempotencyRecord> existing = find(claim.key());
+    if (existing.isEmpty()) {
+      return new ClaimResult(ClaimOutcome.CONFLICT, null, "concurrent insert race");
+    }
+    IdempotencyRecord rec = existing.get();
+    if (!rec.payloadHash().equals(claim.payloadHash())) {
+      return new ClaimResult(ClaimOutcome.CONFLICT, rec, "payload hash mismatch");
+    }
+    if (rec.status() == IdempotencyStatus.PENDING) {
+      return new ClaimResult(ClaimOutcome.CONFLICT, rec, "in-flight duplicate");
+    }
+    return new ClaimResult(ClaimOutcome.REPLAY, rec, "replay");
   }
 
   @Override

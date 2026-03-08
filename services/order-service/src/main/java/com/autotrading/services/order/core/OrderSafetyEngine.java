@@ -74,7 +74,10 @@ public class OrderSafetyEngine {
           .build();
     }
 
-    String key = request.getRequestContext().getIdempotencyKey();
+    // Namespace the key so order-service does not collide with risk-service
+    // (or any other upstream service) that also claims the same idempotency key
+    // against the shared idempotency_records table.
+    String key = "order:" + request.getRequestContext().getIdempotencyKey();
     String payloadHash = request.getAgentId() + ":" + request.getSignalId() + ":" + request.getQty();
     ClaimResult claim = idempotencyService.claim(new IdempotencyClaim(key, payloadHash, Instant.now(clock)));
 

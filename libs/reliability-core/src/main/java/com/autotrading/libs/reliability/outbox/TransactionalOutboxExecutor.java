@@ -6,11 +6,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Executes a domain mutation and appends an outbox event within a single database transaction.
- * <p>
- * Both the domain mutation and the outbox append succeed or fail atomically,
- * guaranteeing that every committed domain change has a corresponding outbox event
- * scheduled for relay to Kafka.
+ *
+ * @deprecated The transactional outbox pattern has been replaced with a Kafka-first approach.
+ *     Only {@code ingress-gateway-service} retains the outbox (as a Kafka fallback via
+ *     {@link KafkaFirstPublisher}); all other services publish directly to Kafka.
+ *     This class will be removed in a future cleanup pass.
  */
+@Deprecated
 public class TransactionalOutboxExecutor {
   private final OutboxRepository outboxRepository;
 
@@ -21,7 +23,10 @@ public class TransactionalOutboxExecutor {
   /**
    * Runs {@code domainMutation} and {@code outboxEventSupplier} inside one transaction.
    * If either fails, both are rolled back.
+   *
+   * @deprecated Use direct Kafka publish after the transaction commit instead.
    */
+  @Deprecated
   @Transactional
   public <T> T execute(Supplier<T> domainMutation, Supplier<OutboxEvent> outboxEventSupplier) {
     T result = domainMutation.get();
@@ -29,3 +34,4 @@ public class TransactionalOutboxExecutor {
     return result;
   }
 }
+

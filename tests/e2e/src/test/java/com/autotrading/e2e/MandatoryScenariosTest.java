@@ -21,7 +21,7 @@ import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.libs.reliability.outbox.InMemoryOutboxRepository;
 import com.autotrading.libs.reliability.outbox.OutboxDispatcher;
 import com.autotrading.libs.reliability.outbox.OutboxEvent;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.reliability.outbox.OutboxStatus;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
@@ -92,12 +92,12 @@ class MandatoryScenariosTest {
   // Helpers
   // ────────────────────────────────────────────────────────────────────────
 
-  private BrokerConnectorEngine newBrokerEngine(OutboxRepository outbox) {
+  private BrokerConnectorEngine newBrokerEngine(DirectKafkaPublisher publisher) {
     return new BrokerConnectorEngine(
         new InMemoryIdempotencyService(),
         mock(BrokerOrderRepository.class),
         mock(ExecutionRepository.class),
-        outbox, new ObjectMapper());
+        publisher, new ObjectMapper());
   }
 
   private OrderSafetyEngine newOrderEngine(Clock clock) {
@@ -115,7 +115,7 @@ class MandatoryScenariosTest {
         orderStub, new SimplePolicyEngine(),
         mock(RiskDecisionRepository.class),
         mock(PolicyDecisionLogRepository.class),
-        mock(OutboxRepository.class), new ObjectMapper());
+        mock(DirectKafkaPublisher.class), new ObjectMapper());
   }
 
   private record GrpcStack(
@@ -125,8 +125,7 @@ class MandatoryScenariosTest {
       RiskDecisionServiceGrpc.RiskDecisionServiceBlockingStub riskStub) {}
 
   private GrpcStack buildFullStack(Clock clock) throws Exception {
-    InMemoryOutboxRepository outbox = new InMemoryOutboxRepository();
-    BrokerConnectorEngine brokerEngine = newBrokerEngine(outbox);
+    BrokerConnectorEngine brokerEngine = newBrokerEngine(mock(DirectKafkaPublisher.class));
 
     String brokerName = InProcessServerBuilder.generateName();
     brokerServer = InProcessServerBuilder.forName(brokerName).directExecutor()
@@ -309,7 +308,7 @@ class MandatoryScenariosTest {
     for (int i = 1; i <= 5; i++) {
       Instant now = Instant.now();
       outbox.append(new OutboxEvent("evt-" + i, "trade.events.routed.v1",
-          "agent-1", "{\"n\":" + i + "}", OutboxStatus.NEW, 0, null, now, now));
+          "agent-1", "{\"n\":" + i + "}", OutboxStatus.NEW, 0, null, null, now, now));
     }
 
     OutboxDispatcher dispatcher = new OutboxDispatcher(outbox, event -> delivered.add(event.eventId()), metrics);
@@ -353,15 +352,15 @@ class MandatoryScenariosTest {
   @Test
   @DisplayName("Scenario 11: Connector engine restart preserves execution dedup")
   void connectorRestartPreservesIdempotency() {
-    InMemoryOutboxRepository outbox = new InMemoryOutboxRepository();
+    DirectKafkaPublisher publisher = mock(DirectKafkaPublisher.class);
 
     // First engine instance processes exec-1
-    BrokerConnectorEngine engine1 = newBrokerEngine(outbox);
+    BrokerConnectorEngine engine1 = newBrokerEngine(publisher);
     assertThat(engine1.recordExecution("exec-restart-1")).isTrue();
     assertThat(engine1.recordExecution("exec-restart-2")).isTrue();
 
-    // Simulated restart: new engine instance with same outbox
-    BrokerConnectorEngine engine2 = newBrokerEngine(outbox);
+    // Simulated restart: new engine instance with same publisher
+    BrokerConnectorEngine engine2 = newBrokerEngine(publisher);
     // New instance has fresh in-memory set, but the InMemoryIdempotencyService
     // is also fresh — in production, DB-backed idempotency persists across restarts
     assertThat(engine2.recordExecution("exec-restart-3")).isTrue();
@@ -381,7 +380,7 @@ class MandatoryScenariosTest {
 
     Instant now = Instant.now();
     outbox.append(new OutboxEvent("evt-fail-1", "orders.status.v1",
-        "agent-1", "{}", OutboxStatus.NEW, 0, null, now, now));
+        "agent-1", "{}", OutboxStatus.NEW, 0, null, null, now, now));
 
     // Dispatcher that always fails
     OutboxDispatcher failing = new OutboxDispatcher(outbox, event -> {
@@ -392,7 +391,7 @@ class MandatoryScenariosTest {
 
     // New events still queued
     outbox.append(new OutboxEvent("evt-fail-2", "orders.status.v1",
-        "agent-1", "{}", OutboxStatus.NEW, 0, null, now, now));
+        "agent-1", "{}", OutboxStatus.NEW, 0, null, null, now, now));
 
     // Recovery dispatcher
     OutboxDispatcher recovered = new OutboxDispatcher(outbox, event -> delivered.add(event.eventId()), metrics);

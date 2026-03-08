@@ -1,0 +1,95 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.autotrading</groupId>
+    <artifactId>autotrading-implementation</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>kafka-client</artifactId>
+  <name>kafka-client</name>
+  <description>
+    Shared Kafka producer SDK: DirectKafkaPublisher (raw kafka-clients with backoff retry),
+    KafkaFirstPublisher (Kafka-first with outbox fallback), KafkaOutboxPublisher.
+  </description>
+
+  <dependencies>
+    <!-- Core Kafka producer/consumer API (Apache / Confluent open-source) -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <!-- version managed by spring-boot-dependencies BOM -->
+    </dependency>
+
+    <!-- reliability-core: OutboxRepository, OutboxPublisher, OutboxEvent, ReliabilityMetrics -->
+    <dependency>
+      <groupId>com.autotrading</groupId>
+      <artifactId>reliability-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <!-- Spring Boot auto-configuration support -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <!-- Spring TX: TransactionTemplate used by KafkaFirstPublisher -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-tx</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Jakarta annotation API: @PreDestroy on DirectKafkaPublisher -->
+    <dependency>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- Micrometer: optional metrics enrichment -->
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-core</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>3.26.3</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

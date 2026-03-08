@@ -5,9 +5,6 @@ import com.autotrading.command.v1.EvaluateSignalRequest;
 import com.autotrading.command.v1.EvaluateSignalResponse;
 import com.autotrading.command.v1.OrderCommandServiceGrpc;
 import com.autotrading.command.v1.RiskDecisionServiceGrpc;
-import com.autotrading.libs.reliability.outbox.OutboxEvent;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
-import com.autotrading.libs.reliability.outbox.OutboxStatus;
 import com.autotrading.services.risk.core.PolicyAuditEvent;
 import com.autotrading.services.risk.core.PolicyEvaluationResult;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
@@ -23,20 +20,29 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * gRPC service for risk policy evaluation.
+ *
+ * <p>Publishes the {@code policy.evaluations.audit.v1} event directly to Kafka after
+ * persisting to the DB. No outbox is used. Kafka publish failure is best-effort: the
+ * audit event is logged as a warning but does not fail the gRPC response.
+ */
 public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisionServiceImplBase {
 
   private static final Logger log = LoggerFactory.getLogger(RiskDecisionGrpcService.class);
+  private static final String AUDIT_TOPIC = "policy.evaluations.audit.v1";
 
   private final OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub;
   private final SimplePolicyEngine policyEngine;
   private final RiskDecisionRepository riskDecisionRepository;
   private final PolicyDecisionLogRepository policyDecisionLogRepository;
-  private final OutboxRepository outboxRepository;
+  private final DirectKafkaPublisher bestEffortPublisher;
   private final ObjectMapper objectMapper;
   private final List<PolicyAuditEvent> auditEvents = new CopyOnWriteArrayList<>();
 
@@ -45,13 +51,13 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
       SimplePolicyEngine policyEngine,
       RiskDecisionRepository riskDecisionRepository,
       PolicyDecisionLogRepository policyDecisionLogRepository,
-      OutboxRepository outboxRepository,
+      DirectKafkaPublisher bestEffortPublisher,
       ObjectMapper objectMapper) {
     this.orderStub = orderStub;
     this.policyEngine = policyEngine;
     this.riskDecisionRepository = riskDecisionRepository;
     this.policyDecisionLogRepository = policyDecisionLogRepository;
-    this.outboxRepository = outboxRepository;
+    this.bestEffortPublisher = bestEffortPublisher;
     this.objectMapper = objectMapper;
   }
 
@@ -112,7 +118,7 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
           result.policyVersion(), result.policyRuleSet(), latencyMs, now);
       policyDecisionLogRepository.save(logEntity);
 
-      // Publish audit event to outbox for downstream consumers
+      // Publish audit event directly to Kafka — best-effort, does not fail the gRPC call
       String auditPayload = objectMapper.writeValueAsString(java.util.Map.of(
           "riskDecisionId", riskDecisionId,
           "signalId", request.getSignalId(),
@@ -121,13 +127,7 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
           "decision", result.decision(),
           "policyVersion", result.policyVersion(),
           "latencyMs", latencyMs));
-      outboxRepository.append(new OutboxEvent(
-          "audit-" + UUID.randomUUID(),
-          "policy.evaluations.audit.v1",
-          request.getAgentId(),
-          auditPayload,
-          OutboxStatus.NEW,
-          0, null, now, now));
+      bestEffortPublisher.publishBestEffort(AUDIT_TOPIC, request.getAgentId(), auditPayload);
 
       auditEvents.add(new PolicyAuditEvent(
           traceId,

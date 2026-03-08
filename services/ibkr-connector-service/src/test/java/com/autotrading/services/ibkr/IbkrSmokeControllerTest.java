@@ -5,7 +5,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,7 +23,7 @@ class IbkrSmokeControllerTest {
         IbkrSmokeController controller = new IbkrSmokeController(
                 new BrokerConnectorEngine(new InMemoryIdempotencyService(),
                         mock(BrokerOrderRepository.class), mock(ExecutionRepository.class),
-                        mock(OutboxRepository.class), new ObjectMapper()));
+                        mock(DirectKafkaPublisher.class), new ObjectMapper()));
 
         Map<String, Object> stats = controller.stats();
 
@@ -35,7 +35,7 @@ class IbkrSmokeControllerTest {
     void statsReflectsTotalSubmitCountAfterSubmissions() {
         BrokerConnectorEngine engine = new BrokerConnectorEngine(new InMemoryIdempotencyService(),
                 mock(BrokerOrderRepository.class), mock(ExecutionRepository.class),
-                mock(OutboxRepository.class), new ObjectMapper());
+                mock(DirectKafkaPublisher.class), new ObjectMapper());
         IbkrSmokeController controller = new IbkrSmokeController(engine);
 
         engine.submit(SubmitOrderRequest.newBuilder()

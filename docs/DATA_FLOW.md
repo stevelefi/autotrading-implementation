@@ -15,20 +15,24 @@
 │    ingress-gateway-service       │  HTTP :18080
 │                                  │
 │  1. Normalize + validate         │
-│  2. Persist → ingress_raw_events │
-│  3. Append → outbox_events (TX)  │
-│  4. OutboxPoller → Kafka         │
+│  2. @Transactional:              │
+│     - Persist → ingress_raw_events  (always; audit trail)
+│     - Claim idempotency key      │
+│  3. afterCommit() callback:      │
+│     KafkaFirstPublisher.publish()│
+│     ├─ Kafka OK  → delivered     │
+│     └─ Kafka fail → outbox_events│  REQUIRES_NEW TX; polled with backoff
 └──────────────┬───────────────────┘
                │  ingress.events.normalized.v1
                ▼
 ┌──────────────────────────────────┐
 │   event-processor-service        │  HTTP :18085
 │                                  │
-│  1. ConsumerDeduper (consumer_inbox)
+│  1. @Transactional + ConsumerDeduper (consumer_inbox)
 │  2. EventProcessorRouter.route() │
 │  3. Persist → routed_trade_events│
-│  4. Append → outbox_events (TX)  │
-│  5. OutboxPoller → Kafka         │
+│  4. DirectKafkaPublisher.publish() ┼──► trade.events.routed.v1
+│     fail → throw → rollback → re-queue
 └──────────────┬───────────────────┘
                │  trade.events.routed.v1
                ▼
@@ -53,9 +57,10 @@
 │  3. @Transactional:              │
 │     - Persist → risk_decisions   │
 │     - Persist → policy_decision_log
-│     - Append → outbox_events     │
-│       (policy.evaluations.audit.v1)
-│  4. gRPC CreateOrderIntent ──────┼──► order-service :19092
+│  4. DirectKafkaPublisher           │
+│     .publishBestEffort() ────────┼──► policy.evaluations.audit.v1
+│     (best-effort; Kafka fail logged as WARN, gRPC response unaffected)
+│  5. gRPC CreateOrderIntent ──────┼──► order-service :19092
 └──────────────────────────────────┘
                │  gRPC CreateOrderIntentRequest
                │    decision (APPROVE / DENY)
@@ -83,17 +88,17 @@
 │  1. IdempotencyService.claim()   │
 │  2. @Transactional:              │
 │     - Persist → broker_orders    │
-│     - Append → outbox_events     │
-│       (orders.status.v1)         │
+│     - DirectKafkaPublisher       │
+│       .publishBestEffort() ──────┼──► orders.status.v1
 │  3. Return broker_submit_id      │
 │                                  │
 │  [Later — fill callback]         │
 │  4. @Transactional:              │
 │     - Persist → executions       │
-│     - Append → outbox_events     │
-│       (fills.executed.v1)        │
+│     - DirectKafkaPublisher       │
+│       .publishBestEffort() ──────┼──► fills.executed.v1
 └──────────────┬───────────────────┘
-               │  fills.executed.v1 (via outbox)
+               │  fills.executed.v1
                ▼
 ┌──────────────────────────────────┐
 │   performance-service            │  HTTP :18087
@@ -102,57 +107,108 @@
 │  2. ConcurrentHashMap.compute()  │  atomic position update
 │  3. Persist → positions          │
 │  4. Persist → pnl_snapshots      │
-│  5. Append → outbox_events       │
-│     (positions.updated.v1,       │
-│      pnl.snapshots.v1)           │
 └──────────────────────────────────┘
 ```
 
 ---
 
-## 2. Outbox / Inbox Pattern
+## 2. Kafka-First Publishing with Outbox Fallback (ingress only)
 
-All Kafka publishing in this system uses the transactional outbox pattern:
+`ingress-gateway-service` is the **only** service that still uses the transactional outbox, and
+only as a Kafka-failure safety net.  All other services publish to Kafka directly in the request
+path and rely on broker-level retry (uncommitted offset) for resilience.
+
+### ingress-gateway-service — Kafka-first flow
 
 ```
-Domain code  (@Transactional)
+IngressService.accept()  (@Transactional)
     │
-    ├─ repository.save(domainEntity)    ─┐
-    └─ outboxRepository.append(event)   ─┘  committed atomically
+    ├─ rawEventRepository.save()      ─┐  always — audit / troubleshoot trail
+    └─ idempotencyService.markCompleted() ┘  committed atomically
                │
-               │  outbox_events table (status=NEW)
+    TransactionSynchronization.afterCommit()   ← fires after TX commits
                │
-       OutboxPollerLifecycle  (background thread, all services)
-               │  SELECT ... WHERE status='NEW' ORDER BY created_at_utc
-               ▼
-       KafkaOutboxPublisher.publish()
-               │  on success → UPDATE status='DELIVERED'
-               │  on failure → UPDATE status='FAILED', attempts++
-               ▼
-       Kafka topic (Redpanda)
+    KafkaFirstPublisher.publish(topic, partitionKey, payload)
+               │
+               ├─ DirectKafkaPublisher.publish()   ← doubling backoff (§ below)
+               │       OK  → delivered to ingress.events.normalized.v1
+               │
+               └─ Kafka exhausts budget (KafkaPublishException)
+                       │
+                       └─ outboxRepository.append()  [PROPAGATION_REQUIRES_NEW TX]
+                                  │
+                                  │  outbox_events table (status=NEW)
+                                  │
+                              OutboxPollerLifecycle  (ingress only; 500 ms)
+                                  │
+                              OutboxDispatcher.dispatch()
+                                  │  status IN ('NEW','FAILED')
+                                  │    AND (next_retry_at IS NULL
+                                  │         OR next_retry_at <= NOW())
+                                  │
+                                  ├─ Kafka OK  → status='DELIVERED'
+                                  └─ Kafka fail → status='FAILED'
+                                       next_retry_at = now() + min(2^attempt, 300)s
+                                       attempts >= 10 → next_retry_at=NULL (parked)
 ```
 
-Consumer side (all `@KafkaListener` methods):
+### DirectKafkaPublisher retry budget
+
+Every `DirectKafkaPublisher.publish()` call retries with **doubling back-off** until the
+total budget (`autotrading.kafka.publish-timeout-ms`, default **500 ms** per attempt;
+`TOTAL_PUBLISH_BUDGET_MS` hard-cap **5 000 ms** globally) is exhausted:
+
+```
+attempt 1: send → wait up to publish-timeout-ms
+attempt 2: sleep 10 ms  → retry
+attempt 3: sleep 20 ms  → retry
+attempt 4: sleep 40 ms  → retry
+...                        (doubling each time)
+Budget > 5 000 ms total  → throw KafkaPublishException
+```
+
+For **audit / status paths** (`publishBestEffort`) the `KafkaPublishException` is caught
+internally and logged at WARN — the caller never sees an exception.
+
+### All other services — direct Kafka publish
+
+```
+@Transactional  @KafkaListener method
+    │
+    ├─ ConsumerDeduper.runOnce()  (insert consumer_inbox; skip if duplicate)
+    ├─ domain logic + repository.save()
+    └─ DirectKafkaPublisher.publish(topic, key, payload)
+           │  (internal doubling-backoff up to 5 s total)
+           ├─ OK  → method returns, offset committed
+           └─ KafkaPublishException propagates
+                  → @Transactional rolls back DB writes
+                  → offset NOT committed
+                  → Kafka re-delivers (broker retry)
+```
+
+`autotrading.outbox.poller.enabled` is `false` for every service except ingress — the
+`OutboxPollerLifecycle` and `OutboxDispatcher` beans are not created in those processes.
+
+### Consumer-side deduplication (all services)
 
 ```
 Kafka record
     ▼
 @KafkaListener + @Transactional
     │
-    ├─ ConsumerDeduper.runOnce(consumerName, eventId, work)
-    │       │
-    │       ├─ INSERT INTO consumer_inbox (consumer_name, event_id)
-    │       │    conflict → skip (already processed, no-op)
-    │       │
-    │       └─ work.run()  ← domain logic in same TX
-    │
-    └─ commit offset on success, re-queue on failure (re-throws)
+    └─ ConsumerDeduper.runOnce(consumerName, eventId, work)
+            │
+            ├─ INSERT INTO consumer_inbox (consumer_name, event_id)
+            │    conflict → skip (already processed, no-op)
+            │
+            └─ work.run()  ← domain logic in same TX
 ```
 
 Guarantees:
-- Publishing never happens without the domain mutation succeeding
+- Raw ingress event is always persisted for audit regardless of Kafka state
 - A consumer crash before TX commit replays the record (no data loss)
 - A replayed record hits `ConsumerDeduper` — exactly-once processing
+- Downstream Kafka failures surface immediately (throw → re-queue) rather than silently queuing in an outbox
 
 ---
 
@@ -172,7 +228,8 @@ ibkr-connector-service  →  idempotency claim  →  persist  →  broker_submit
     │
     └─► SubmitOrderResponse back up the call chain
         order-service persists order_intents, order_ledger, order_state_history
-        risk-service persists risk_decisions, policy_decision_log, audit outbox event
+        risk-service persists risk_decisions, policy_decision_log;
+        best-effort publish → policy.evaluations.audit.v1
         agent-runtime-service receives EvaluateSignalResponse
 ```
 
