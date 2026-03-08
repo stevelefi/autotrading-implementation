@@ -93,12 +93,20 @@ helm lint infra/helm/charts/trading-service
 helm template trading-service infra/helm/charts/trading-service \
   -f infra/helm/charts/trading-service/values.yaml > /dev/null
 
-# Local smoke (optional, requires Docker)
-make up && make smoke-local && make down
+# Full stack smoke gate (requires Docker — mandatory before opening a PR)
+make up          # bring up postgres + redpanda + ibkr-sim + all 8 services
+make smoke-local # validate all 5 signal-path phases
+make down        # tear down after pass
 ```
 
-Run all pre-commit checks with:
+Run unit + coverage + spec + Helm checks with:
 
 ```bash
 make pre-commit
+```
+
+Run everything together (mirrors CI):
+
+```bash
+make ci-local
 ```
