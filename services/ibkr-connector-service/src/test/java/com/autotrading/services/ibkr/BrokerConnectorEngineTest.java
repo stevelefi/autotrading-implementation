@@ -11,7 +11,7 @@ import com.autotrading.command.v1.ReplaceOrderRequest;
 import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.command.v1.CommandStatus;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderEntity;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
@@ -28,12 +28,12 @@ class BrokerConnectorEngineTest {
   void setUp() {
     BrokerOrderRepository mockRepo = mock(BrokerOrderRepository.class);
     lenient().when(mockRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    OutboxRepository mockOutbox = mock(OutboxRepository.class);
+    DirectKafkaPublisher mockPublisher = mock(DirectKafkaPublisher.class);
     engine = new BrokerConnectorEngine(
         new InMemoryIdempotencyService(),
         mockRepo,
         mock(ExecutionRepository.class),
-        mockOutbox,
+        mockPublisher,
         new ObjectMapper());
   }
 

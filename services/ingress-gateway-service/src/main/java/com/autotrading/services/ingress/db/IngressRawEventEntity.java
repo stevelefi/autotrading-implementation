@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "ingress_raw_events")
@@ -44,7 +46,8 @@ public class IngressRawEventEntity {
   @Column(name = "integration_id")
   private String integrationId;
 
-  @Column(name = "principal_json", columnDefinition = "TEXT")
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "principal_json", columnDefinition = "jsonb")
   private String principalJson;
 
   @Column(name = "payload_json", nullable = false, columnDefinition = "TEXT")

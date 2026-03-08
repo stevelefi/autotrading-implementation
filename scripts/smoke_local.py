@@ -94,6 +94,24 @@ def wait_for_broker_submit_delta(broker_url: str, baseline: int, timeout_sec: in
     )
 
 
+def wait_for_broker_count_stable(broker_url: str, window_sec: int = 4, poll_sec: int = 1, timeout_sec: int = 30) -> int:
+    """Poll broker stats until the count stays unchanged for window_sec, then return it.
+    Used to drain any in-flight async events before snapshotting a stable baseline."""
+    end = time.time() + timeout_sec
+    last_count: int = -1
+    stable_since: float | None = None
+    while time.time() < end:
+        result = http_json("GET", f"{broker_url}/internal/smoke/stats")
+        current = int(get_nested(result.body_json, "total_submit_count") or 0)
+        if current != last_count:
+            last_count = current
+            stable_since = time.time()
+        elif stable_since is not None and (time.time() - stable_since) >= window_sec:
+            return current
+        time.sleep(poll_sec)
+    return last_count
+
+
 def get_nested(obj: Any, *keys: str) -> Any:
     current = obj
     for key in keys:
@@ -219,6 +237,9 @@ def main() -> int:
             "qty": 1,
             "side": "BUY",
         }
+        # Wait for any in-flight async events from Phase 2 to drain so the baseline is stable.
+        print("  waiting for in-flight async events to drain before snapshot ...", flush=True)
+        broker_before_count = wait_for_broker_count_stable(broker_url, window_sec=4, poll_sec=1, timeout_sec=30)
         broker_before = http_json("GET", f"{broker_url}/internal/smoke/stats")
         risk_first = http_json("POST", f"{risk_url}/internal/smoke/command-path", risk_payload)
         risk_second = http_json("POST", f"{risk_url}/internal/smoke/command-path", risk_payload)
@@ -235,7 +256,6 @@ def main() -> int:
         ensure(risk_second.status == 200, f"expected risk second status 200, got {risk_second.status}")
         ensure(get_nested(risk_first.body_json, "decision") == "DECISION_ALLOW", "expected risk first decision ALLOW")
         ensure(get_nested(risk_second.body_json, "decision") == "DECISION_ALLOW", "expected risk second decision ALLOW")
-        broker_before_count = int(get_nested(broker_before.body_json, "total_submit_count") or 0)
         broker_after_count = int(get_nested(broker_stats.body_json, "total_submit_count") or 0)
         submit_count_delta = broker_after_count - broker_before_count
         ensure(submit_count_delta == 1, f"expected broker submit delta 1 after retry, got {submit_count_delta}")

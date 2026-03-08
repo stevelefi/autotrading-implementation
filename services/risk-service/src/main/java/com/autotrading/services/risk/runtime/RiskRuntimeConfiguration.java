@@ -1,5 +1,6 @@
 package com.autotrading.services.risk.runtime;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
@@ -8,9 +9,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.command.v1.OrderCommandServiceGrpc;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
 import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
@@ -55,10 +56,10 @@ public class RiskRuntimeConfiguration {
       SimplePolicyEngine policyEngine,
       RiskDecisionRepository riskDecisionRepository,
       PolicyDecisionLogRepository policyDecisionLogRepository,
-      OutboxRepository outboxRepository,
+      @Qualifier("bestEffortKafkaPublisher") DirectKafkaPublisher bestEffortPublisher,
       ObjectMapper objectMapper) {
     return new RiskDecisionGrpcService(orderStub, policyEngine, riskDecisionRepository,
-        policyDecisionLogRepository, outboxRepository, objectMapper);
+        policyDecisionLogRepository, bestEffortPublisher, objectMapper);
   }
 
   @Bean

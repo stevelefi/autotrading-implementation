@@ -15,10 +15,23 @@ public class InMemoryOutboxRepository implements OutboxRepository {
     events.put(event.eventId(), event);
   }
 
+  /** @deprecated Use {@link #pollRetryable(int)} instead. */
+  @Deprecated
   @Override
   public List<OutboxEvent> pollNew(int batchSize) {
     return events.values().stream()
         .filter(e -> e.status() == OutboxStatus.NEW)
+        .sorted(Comparator.comparing(OutboxEvent::createdAtUtc))
+        .limit(batchSize)
+        .toList();
+  }
+
+  @Override
+  public List<OutboxEvent> pollRetryable(int batchSize) {
+    Instant now = Instant.now();
+    return events.values().stream()
+        .filter(e -> (e.status() == OutboxStatus.NEW || e.status() == OutboxStatus.FAILED)
+            && (e.nextRetryAt() == null || !e.nextRetryAt().isAfter(now)))
         .sorted(Comparator.comparing(OutboxEvent::createdAtUtc))
         .limit(batchSize)
         .toList();
@@ -33,16 +46,20 @@ public class InMemoryOutboxRepository implements OutboxRepository {
   }
 
   @Override
-  public void markFailed(String eventId, String error) {
+  public void markFailed(String eventId, String error, Instant nextRetryAt) {
     OutboxEvent current = events.get(eventId);
     if (current != null) {
-      events.put(eventId, current.markFailed(error, Instant.now()));
+      events.put(eventId, current.markFailed(error, Instant.now(), nextRetryAt));
     }
   }
 
   @Override
   public long countPending() {
-    return events.values().stream().filter(e -> e.status() == OutboxStatus.NEW).count();
+    Instant now = Instant.now();
+    return events.values().stream()
+        .filter(e -> (e.status() == OutboxStatus.NEW || e.status() == OutboxStatus.FAILED)
+            && (e.nextRetryAt() == null || !e.nextRetryAt().isAfter(now)))
+        .count();
   }
 
   public List<OutboxEvent> allEvents() {

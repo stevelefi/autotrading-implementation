@@ -22,16 +22,21 @@ import com.autotrading.libs.idempotency.ClaimOutcome;
 import com.autotrading.libs.idempotency.ClaimResult;
 import com.autotrading.libs.idempotency.IdempotencyClaim;
 import com.autotrading.libs.idempotency.IdempotencyService;
-import com.autotrading.libs.reliability.outbox.OutboxEvent;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
-import com.autotrading.libs.reliability.outbox.OutboxStatus;
 import com.autotrading.services.ibkr.db.BrokerOrderEntity;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionEntity;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Core broker connector engine.
+ *
+ * <p>Publishes to Kafka directly after persisting to the DB. No outbox is used.
+ * Kafka failures are logged and swallowed (the gRPC response is already built at
+ * that point), consistent with the original try-catch pattern around persistence.
+ */
 public class BrokerConnectorEngine {
 
   private static final Logger log = LoggerFactory.getLogger(BrokerConnectorEngine.class);
@@ -39,7 +44,7 @@ public class BrokerConnectorEngine {
   private final IdempotencyService idempotencyService;
   private final BrokerOrderRepository brokerOrderRepository;
   private final ExecutionRepository executionRepository;
-  private final OutboxRepository outboxRepository;
+  private final DirectKafkaPublisher bestEffortPublisher;
   private final ObjectMapper objectMapper;
   private final Map<String, SubmitOrderResponse> submitReplay = new ConcurrentHashMap<>();
   private final Map<String, AtomicInteger> submitCountsByOrderIntent = new ConcurrentHashMap<>();
@@ -48,18 +53,20 @@ public class BrokerConnectorEngine {
   public BrokerConnectorEngine(IdempotencyService idempotencyService,
                                 BrokerOrderRepository brokerOrderRepository,
                                 ExecutionRepository executionRepository,
-                                OutboxRepository outboxRepository,
+                                DirectKafkaPublisher bestEffortPublisher,
                                 ObjectMapper objectMapper) {
     this.idempotencyService = idempotencyService;
     this.brokerOrderRepository = brokerOrderRepository;
     this.executionRepository = executionRepository;
-    this.outboxRepository = outboxRepository;
+    this.bestEffortPublisher = bestEffortPublisher;
     this.objectMapper = objectMapper;
   }
 
   @Transactional
   public SubmitOrderResponse submit(SubmitOrderRequest request) {
-    String key = request.getRequestContext().getIdempotencyKey();
+    // Namespace the key so ibkr-connector does not collide with upstream services
+    // (risk, order) that also claim the same idempotency key in the shared table.
+    String key = "ibkr:" + request.getRequestContext().getIdempotencyKey();
     String payloadHash = request.getOrderIntentId() + ":" + request.getQty() + ":" + request.getOrderType();
     ClaimResult claim = idempotencyService.claim(new IdempotencyClaim(key, payloadHash, Instant.now()));
 
@@ -94,7 +101,7 @@ public class BrokerConnectorEngine {
     submitReplay.put(key, response);
     idempotencyService.markCompleted(key, brokerSubmitId);
 
-    // Persist broker order + publish status event to outbox
+    // Persist broker order, then publish order status directly to Kafka
     try {
       brokerOrderRepository.save(new BrokerOrderEntity(
           brokerSubmitId,
@@ -118,17 +125,11 @@ public class BrokerConnectorEngine {
           "status", "SUBMITTED",
           "submittedAt", now.toString()));
 
-      outboxRepository.append(new OutboxEvent(
-          "ostatus-" + UUID.randomUUID(),
-          "orders.status.v1",
-          request.getAgentId(),
-          statusPayload,
-          OutboxStatus.NEW,
-          0, null, now, now));
+      bestEffortPublisher.publishBestEffort("orders.status.v1", request.getAgentId(), statusPayload);
 
       log.info("ibkr submit accepted brokerSubmitId={} orderIntentId={}", brokerSubmitId, request.getOrderIntentId());
     } catch (Exception e) {
-      log.warn("ibkr DB/outbox persist failed orderIntentId={} cause={}", request.getOrderIntentId(), e.getMessage(), e);
+      log.warn("ibkr DB/kafka publish failed orderIntentId={} cause={}", request.getOrderIntentId(), e.getMessage(), e);
     }
 
     return response;
@@ -161,7 +162,8 @@ public class BrokerConnectorEngine {
 
   /**
    * Records a fill execution from the broker callback.
-   * Deduplicates by execId, persists to executions table, and publishes fills.executed.v1 outbox event.
+   * Deduplicates by execId, persists to executions table, and publishes fills.executed.v1
+   * directly to Kafka.
    *
    * @return true if this was a new execution, false if duplicate
    */
@@ -196,18 +198,12 @@ public class BrokerConnectorEngine {
           "commission", commission != null ? commission.toPlainString() : "0",
           "fillTs", fillTs.toString()));
 
-      outboxRepository.append(new OutboxEvent(
-          "fill-" + UUID.randomUUID(),
-          "fills.executed.v1",
-          agentId,
-          fillPayload,
-          OutboxStatus.NEW,
-          0, null, now, now));
+      bestEffortPublisher.publishBestEffort("fills.executed.v1", agentId, fillPayload);
 
       log.info("execution recorded execId={} orderIntentId={} qty={} price={}",
           execId, orderIntentId, fillQty, fillPrice);
     } catch (Exception e) {
-      log.error("failed to persist execution execId={} cause={}", execId, e.getMessage(), e);
+      log.error("failed to persist/publish execution execId={} cause={}", execId, e.getMessage(), e);
       seenExecIds.remove(execId); // allow retry
     }
     return true;

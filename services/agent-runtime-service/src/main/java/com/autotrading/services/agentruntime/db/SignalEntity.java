@@ -1,10 +1,14 @@
 package com.autotrading.services.agentruntime.db;
 
+import java.time.Instant;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 
 @Entity
 @Table(name = "signals")
@@ -38,7 +42,8 @@ public class SignalEntity {
   @Column(name = "origin_source_event_id")
   private String originSourceEventId;
 
-  @Column(name = "raw_payload_json", nullable = false, columnDefinition = "TEXT")
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "raw_payload_json", nullable = false, columnDefinition = "jsonb")
   private String rawPayloadJson;
 
   @Column(name = "signal_ts", nullable = false)

@@ -3,12 +3,13 @@ package com.autotrading.libs.observability;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.Ordered;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 
 import com.autotrading.libs.idempotency.IdempotencyService;
 import com.autotrading.libs.idempotency.JdbcIdempotencyService;
@@ -17,7 +18,6 @@ import com.autotrading.libs.reliability.inbox.ConsumerInboxRepository;
 import com.autotrading.libs.reliability.inbox.JdbcConsumerInboxRepository;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.libs.reliability.outbox.JdbcOutboxRepository;
-import com.autotrading.libs.reliability.outbox.KafkaOutboxPublisher;
 import com.autotrading.libs.reliability.outbox.OutboxDispatcher;
 import com.autotrading.libs.reliability.outbox.OutboxPollerLifecycle;
 import com.autotrading.libs.reliability.outbox.OutboxPublisher;
@@ -35,12 +35,17 @@ import io.micrometer.core.instrument.MeterRegistry;
  *   <li>Metrics: {@link ReliabilityMetrics} (uses {@link MeterRegistry} when available)
  *   <li>JDBC persistence (requires {@link JdbcTemplate}):
  *       {@link JdbcOutboxRepository}, {@link JdbcConsumerInboxRepository}, {@link JdbcIdempotencyService}
- *   <li>Kafka publisher (requires {@link KafkaTemplate}): {@link KafkaOutboxPublisher}
- *   <li>Outbox relay: {@link OutboxDispatcher}, {@link OutboxPollerLifecycle}
+ *   <li>Outbox relay (only when {@code autotrading.outbox.poller.enabled=true}, default true):
+ *       {@link OutboxDispatcher}, {@link OutboxPollerLifecycle}
  *   <li>Helpers: {@link TransactionalOutboxExecutor}, {@link ConsumerDeduper}
  * </ul>
+ *
+ * <p>Kafka publisher beans ({@code KafkaOutboxPublisher}, {@code KafkaFirstPublisher}) are
+ * provided by the {@code kafka-client} library auto-configuration, not here.
+ * Non-ingress services should set {@code autotrading.outbox.poller.enabled=false} to suppress
+ * the outbox poller.
  */
-@AutoConfiguration
+@AutoConfiguration(after = JdbcTemplateAutoConfiguration.class)
 public class ReliabilityCoreAutoConfiguration {
 
   // ── Observability ────────────────────────────────────────────────────────────
@@ -93,20 +98,13 @@ public class ReliabilityCoreAutoConfiguration {
     return new JdbcIdempotencyService(jdbc);
   }
 
-  // ── Kafka publisher ───────────────────────────────────────────────────────────
 
-  @Bean
-  @ConditionalOnMissingBean(OutboxPublisher.class)
-  @ConditionalOnBean(KafkaTemplate.class)
-  public KafkaOutboxPublisher kafkaOutboxPublisher(KafkaTemplate<String, String> kafkaTemplate) {
-    return new KafkaOutboxPublisher(kafkaTemplate);
-  }
-
-  // ── Outbox relay ─────────────────────────────────────────────────────────────
+  // ── Outbox relay (opt-in; enabled by default, disabled in non-ingress services) ─────────────
 
   @Bean
   @ConditionalOnMissingBean
   @ConditionalOnBean({OutboxRepository.class, OutboxPublisher.class})
+  @ConditionalOnProperty(name = "autotrading.outbox.poller.enabled", havingValue = "true", matchIfMissing = true)
   public OutboxDispatcher outboxDispatcher(
       OutboxRepository outboxRepository,
       OutboxPublisher publisher,
@@ -117,15 +115,18 @@ public class ReliabilityCoreAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean
   @ConditionalOnBean(OutboxDispatcher.class)
+  @ConditionalOnProperty(name = "autotrading.outbox.poller.enabled", havingValue = "true", matchIfMissing = true)
   public OutboxPollerLifecycle outboxPollerLifecycle(OutboxDispatcher outboxDispatcher) {
     return new OutboxPollerLifecycle(outboxDispatcher);
   }
+
 
   // ── Application-layer helpers ────────────────────────────────────────────────
 
   @Bean
   @ConditionalOnMissingBean
   @ConditionalOnBean(OutboxRepository.class)
+  @Deprecated
   public TransactionalOutboxExecutor transactionalOutboxExecutor(OutboxRepository outboxRepository) {
     return new TransactionalOutboxExecutor(outboxRepository);
   }
@@ -139,4 +140,3 @@ public class ReliabilityCoreAutoConfiguration {
     return new ConsumerDeduper(consumerInboxRepository, metrics);
   }
 }
-

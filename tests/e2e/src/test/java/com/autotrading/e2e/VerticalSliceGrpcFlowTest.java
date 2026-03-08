@@ -3,7 +3,7 @@ package com.autotrading.e2e;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
-import com.autotrading.libs.reliability.outbox.OutboxRepository;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.autotrading.services.order.db.OrderIntentRepository;
@@ -57,7 +57,7 @@ class VerticalSliceGrpcFlowTest {
   void riskToOrderToBrokerFlowRunsAndDedupesRetries() throws Exception {
     BrokerConnectorEngine brokerEngine = new BrokerConnectorEngine(
         new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
-        mock(ExecutionRepository.class), mock(OutboxRepository.class), new ObjectMapper());
+        mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper());
     String brokerName = InProcessServerBuilder.generateName();
     brokerServer = InProcessServerBuilder.forName(brokerName).directExecutor()
         .addService(new BrokerCommandGrpcService(brokerEngine))
@@ -83,7 +83,7 @@ class VerticalSliceGrpcFlowTest {
     OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub = OrderCommandServiceGrpc.newBlockingStub(orderChannel);
     RiskDecisionGrpcService riskImpl = new RiskDecisionGrpcService(orderStub, new SimplePolicyEngine(),
         mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
-        mock(OutboxRepository.class), new ObjectMapper());
+        mock(DirectKafkaPublisher.class), new ObjectMapper());
 
     String riskName = InProcessServerBuilder.generateName();
     riskServer = InProcessServerBuilder.forName(riskName).directExecutor()

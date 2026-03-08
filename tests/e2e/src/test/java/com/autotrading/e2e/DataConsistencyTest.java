@@ -36,7 +36,7 @@ class DataConsistencyTest {
     for (int i = 1; i <= 10; i++) {
       Instant now = Instant.now();
       outbox.append(new OutboxEvent("evt-" + String.format("%02d", i),
-          "orders.status.v1", "agent-1", "{}", OutboxStatus.NEW, 0, null, now, now));
+          "orders.status.v1", "agent-1", "{}", OutboxStatus.NEW, 0, null, null, now, now));
     }
 
     OutboxDispatcher dispatcher = new OutboxDispatcher(outbox, e -> delivered.add(e.eventId()), metrics);
@@ -110,7 +110,7 @@ class DataConsistencyTest {
     for (int i = 1; i <= 20; i++) {
       Instant now = Instant.now();
       outbox.append(new OutboxEvent("batch-" + i, "test.topic",
-          "agent-1", "{}", OutboxStatus.NEW, 0, null, now, now));
+          "agent-1", "{}", OutboxStatus.NEW, 0, null, null, now, now));
     }
 
     OutboxDispatcher dispatcher = new OutboxDispatcher(outbox, e -> delivered.add(e.eventId()), metrics);
@@ -143,7 +143,7 @@ class DataConsistencyTest {
     for (int i = 1; i <= 5; i++) {
       Instant now = Instant.now();
       outbox.append(new OutboxEvent("partial-" + i, "test.topic",
-          "agent-1", "{}", OutboxStatus.NEW, 0, null, now, now));
+          "agent-1", "{}", OutboxStatus.NEW, 0, null, null, now, now));
     }
 
     // Publisher that fails on 3rd event

@@ -6,6 +6,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "risk_decisions")
@@ -24,7 +26,8 @@ public class RiskDecisionEntity {
   @Column(name = "decision", nullable = false)
   private String decision;
 
-  @Column(name = "deny_reasons_json", nullable = false, columnDefinition = "TEXT")
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "deny_reasons_json", nullable = false, columnDefinition = "jsonb")
   private String denyReasonsJson;
 
   @Column(name = "policy_version", nullable = false)
@@ -33,7 +36,8 @@ public class RiskDecisionEntity {
   @Column(name = "policy_rule_set", nullable = false)
   private String policyRuleSet;
 
-  @Column(name = "matched_rule_ids_json", nullable = false, columnDefinition = "TEXT")
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "matched_rule_ids_json", nullable = false, columnDefinition = "jsonb")
   private String matchedRuleIdsJson;
 
   @Column(name = "failure_mode", nullable = false)

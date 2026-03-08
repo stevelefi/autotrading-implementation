@@ -14,6 +14,7 @@
   <modules>
     <module>libs/contracts</module>
     <module>libs/reliability-core</module>
+    <module>libs/kafka-client</module>
     <module>services/ingress-gateway-service</module>
     <module>services/event-processor-service</module>
     <module>services/agent-runtime-service</module>
@@ -36,6 +37,8 @@
     <coverage.minimum.line>0.50</coverage.minimum.line>
     <coverage.check.skip>true</coverage.check.skip>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- empty default; JaCoCo prepare-agent appends to this at runtime -->
+    <argLine></argLine>
   </properties>
 
   <dependencyManagement>
@@ -81,6 +84,17 @@
           <version>3.5.2</version>
           <configuration>
             <useModulePath>false</useModulePath>
+            <!-- Required for Mockito inline mock maker on Java 17+:
+                 allows ByteBuddy to instrument java.base interfaces like AutoCloseable.
+                 ${argLine} is populated by JaCoCo prepare-agent when the coverage
+                 profile is active; defaults to empty string otherwise. -->
+            <argLine>
+              ${argLine}
+              --add-opens java.base/java.lang=ALL-UNNAMED
+              --add-opens java.base/java.util=ALL-UNNAMED
+              --add-opens java.base/java.io=ALL-UNNAMED
+              -XX:+EnableDynamicAgentLoading
+            </argLine>
           </configuration>
         </plugin>
         <plugin>

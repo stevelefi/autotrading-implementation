@@ -3,6 +3,7 @@ package com.autotrading.e2e;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +28,7 @@ class ReliabilityDrillTest {
     InMemoryOutboxRepository outbox = new InMemoryOutboxRepository();
     ReliabilityMetrics metrics = new ReliabilityMetrics();
 
-    OutboxEvent pending = new OutboxEvent("evt-1", "trade.events.routed.v1", "agent-1", "{}", OutboxStatus.NEW, 0, null, Instant.now(), Instant.now());
+    OutboxEvent pending = new OutboxEvent("evt-1", "trade.events.routed.v1", "agent-1", "{}", OutboxStatus.NEW, 0, null, null, Instant.now(), Instant.now());
     outbox.append(pending);
 
     List<String> delivered = new ArrayList<>();
@@ -45,7 +46,7 @@ class ReliabilityDrillTest {
     assertThat(secondAttempt).isEqualTo(0); // failed events are retained as failed; operator replay is required
 
     // simulate replay action by restoring status to NEW as part of drill runbook
-    outbox.append(new OutboxEvent("evt-replay", "trade.events.routed.v1", "agent-1", "{}", OutboxStatus.NEW, 0, null, Instant.now(), Instant.now()));
+    outbox.append(new OutboxEvent("evt-replay", "trade.events.routed.v1", "agent-1", "{}", OutboxStatus.NEW, 0, null, null, Instant.now(), Instant.now()));
     int replayAttempt = recoveredDispatcher.dispatchBatch(10);
 
     assertThat(replayAttempt).isEqualTo(1);
@@ -61,7 +62,7 @@ class ReliabilityDrillTest {
 
     BrokerConnectorEngine connectorEngine = new BrokerConnectorEngine(
         new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
-        mock(ExecutionRepository.class), outbox, new ObjectMapper());
+        mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper());
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isTrue();
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isFalse();
   }
