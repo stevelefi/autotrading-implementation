@@ -19,7 +19,11 @@ Before writing code, agents must:
 3. Contract change is allowed only after new tagged baseline and spec bump PR.
 
 ## PR Workflow Guardrail
-1. Branch names must follow: Github flows (e.g. `feature/`, `bugfix/`, `hotfix/`, `chore/`) or be prefixed with a Jira ticket ID (e.g. `AT-1234-`).
+1. Branch names must follow: Github flows (e.g. `feature/`, `bugfix/`, `hotfix/`, `chore/`, `release/`) or be prefixed with a Jira ticket ID (e.g. `AT-1234-`).
+2. Validate before pushing — the pre-commit gate (`scripts/check.py`) runs this automatically as check 1/7:
+   ```
+   python3 scripts/branch_check.py
+   ```
 
 ## Required Local Checks Before Commit
 1. Run `tools/spec_sync.py sync` using `repo_url` and `ref` from `SPEC_VERSION.json`.
@@ -131,10 +135,58 @@ python3 scripts/test.py e2e
 - **Create** a new `<Feature>Test.java` when adding a new Kafka consumer path, a new gRPC
   endpoint, or a new failure / fallback mode that has no existing coverage home.
 
+## Development Workflow — Fast Iteration
+
+During active development, **keep infrastructure running** and only rebuild/redeploy the
+application services. This avoids the ~2 min Flyway/Redpanda init cost on every iteration.
+
+### One-time infra bring-up
+```
+python3 scripts/stack.py infra-up
+```
+Starts: postgres, flyway-init, redpanda, redpanda-init, redpanda-console, otel-collector,
+prometheus, loki, promtail, grafana, ibkr-simulator.
+
+Leave this running for the duration of your development session.
+
+### Fast redeploy loop (after every code change)
+```
+# Rebuild images + redeploy all 8 app services (infra unchanged):
+python3 scripts/stack.py restart-app
+
+# Or step by step:
+python3 scripts/stack.py build        # rebuild app Docker images
+python3 scripts/stack.py app-up       # (re)start app services
+```
+
+### Useful during iteration
+```
+python3 scripts/stack.py status       # show running containers
+python3 scripts/stack.py logs         # tail all service logs
+python3 scripts/stack.py logs --service ingress-gateway-service   # single service
+```
+
+### End of session / CI
+```
+python3 scripts/stack.py down         # full teardown including volumes
+```
+
+### Summary of infra vs. app split
+
+| Command | What it touches | When to use |
+|---------|----------------|-------------|
+| `infra-up` | postgres, redpanda, observability | once per dev session |
+| `app-up` | 8 application microservices | after `infra-up` or `build` |
+| `restart-app` | app only (stop → build → start) | after every code change |
+| `app-down` | app only (infra stays) | pause app without losing DB/Kafka state |
+| `up` | full stack | smoke tests / CI |
+| `down` | full stack + volumes | clean slate / end of session |
+
 ## Scripts Quick Reference
 
 | Script | Purpose | Key commands |
 |--------|---------|-------------|
+| `scripts/branch_check.py` | GitHub flow branch name validator | *(no args)* checks current branch; `<name>` checks a specific name |
 | `scripts/test.py` | Maven test runner | `unit` \| `coverage` \| `e2e` \| `all` — add `--module <path>` to target one module |
 | `scripts/check.py` | Pre-commit gate (all checks + summary) | *(no args)* full gate; `--fast` skips e2e; `--skip-helm` skips Helm; `--only <check>...` |
 | `scripts/stack.py` | Local stack manager | `up` \| `down` \| `infra-up` \| `app-up` \| `app-down` \| `restart-app` \| `build` \| `status` \| `logs` \| `validate` \| `ci` |

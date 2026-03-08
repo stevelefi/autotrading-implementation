@@ -3,16 +3,17 @@
 check.py — Pre-commit gate: runs all required local checks and reports results.
 
 Checks run (in order):
-    1. spec-verify    Verify pinned spec baseline (tools/spec_sync.py verify)
-    2. unit           Unit tests — zero failures tolerated
-    3. coverage       JaCoCo coverage gate on core modules (≥50% line)
-    4. e2e            E2E tests — all five test classes in tests/e2e/
-    5. helm-lint      helm lint infra/helm/charts/trading-service
-    6. helm-template  helm template (dry-run render)
+    1. branch-check   Current branch follows GitHub flow naming convention
+    2. spec-verify    Verify pinned spec baseline (tools/spec_sync.py verify)
+    3. unit           Unit tests — zero failures tolerated
+    4. coverage       JaCoCo coverage gate on core modules (≥50% line)
+    5. e2e            E2E tests — all five test classes in tests/e2e/
+    6. helm-lint      helm lint infra/helm/charts/trading-service
+    7. helm-template  helm template (dry-run render)
 
 Usage:
-    python3 scripts/check.py              # full gate — all six checks
-    python3 scripts/check.py --fast       # skip e2e (checks 1,2,3,5,6)
+    python3 scripts/check.py              # full gate — all seven checks
+    python3 scripts/check.py --fast       # skip e2e (checks 1-4,6,7)
     python3 scripts/check.py --skip-helm  # skip Helm checks (useful if helm not installed)
     python3 scripts/check.py --only unit coverage   # run specific checks by name
 
@@ -68,8 +69,13 @@ def run(*args: str) -> int:
 # ── individual checks ──────────────────────────────────────────────────────────
 
 
+def check_branch_check() -> int:
+    banner("Check 1/7: branch-check")
+    return run(sys.executable, "scripts/branch_check.py")
+
+
 def check_spec_verify() -> int:
-    banner("Check 1/6: spec-verify")
+    banner("Check 2/7: spec-verify")
     return run(
         sys.executable, "tools/spec_sync.py", "verify",
         "--dest", "specs/vendor",
@@ -78,12 +84,12 @@ def check_spec_verify() -> int:
 
 
 def check_unit() -> int:
-    banner("Check 2/6: unit tests")
+    banner("Check 3/7: unit tests")
     return run("mvn", "-B", "-DskipITs=true", "test")
 
 
 def check_coverage() -> int:
-    banner("Check 3/6: JaCoCo coverage gate (≥50% line on core modules)")
+    banner("Check 4/7: JaCoCo coverage gate (≥50% line on core modules)")
     return run(
         "mvn", "-B", "-Pcoverage-core",
         "-pl", COVERAGE_CORE_MODULES,
@@ -92,12 +98,12 @@ def check_coverage() -> int:
 
 
 def check_e2e() -> int:
-    banner("Check 4/6: e2e tests")
+    banner("Check 5/7: e2e tests")
     return run("mvn", "-B", "-pl", "tests/e2e", "-am", "test")
 
 
 def check_helm_lint() -> int:
-    banner("Check 5/6: helm lint")
+    banner("Check 6/7: helm lint")
     if not shutil.which("helm"):
         print("[check.py] 'helm' not found on PATH — skipping helm-lint", flush=True)
         return 0
@@ -105,7 +111,7 @@ def check_helm_lint() -> int:
 
 
 def check_helm_template() -> int:
-    banner("Check 6/6: helm template (dry-run render)")
+    banner("Check 7/7: helm template (dry-run render)")
     if not shutil.which("helm"):
         print("[check.py] 'helm' not found on PATH — skipping helm-template", flush=True)
         return 0
@@ -118,6 +124,7 @@ def check_helm_template() -> int:
 # ── gate orchestration ─────────────────────────────────────────────────────────
 
 ALL_CHECKS: list[tuple[str, Callable[[], int]]] = [
+    ("branch-check",   check_branch_check),
     ("spec-verify",    check_spec_verify),
     ("unit",           check_unit),
     ("coverage",       check_coverage),
@@ -170,7 +177,7 @@ def main() -> None:
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Skip e2e tests (runs checks: spec-verify, unit, coverage, helm-lint, helm-template)",
+        help="Skip e2e tests (runs checks: branch-check, spec-verify, unit, coverage, helm-lint, helm-template)",
     )
     parser.add_argument(
         "--skip-helm",
