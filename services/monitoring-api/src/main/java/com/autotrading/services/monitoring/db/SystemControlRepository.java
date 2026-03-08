@@ -1,5 +1,5 @@
 package com.autotrading.services.monitoring.db;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.ListCrudRepository;
 
-public interface SystemControlRepository extends JpaRepository<SystemControlEntity, String> {}
+public interface SystemControlRepository extends ListCrudRepository<SystemControlEntity, String> {}

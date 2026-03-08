@@ -2,46 +2,47 @@ package com.autotrading.services.performance.db;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "pnl_snapshots")
-public class PnlSnapshotEntity {
+@Table("pnl_snapshots")
+public class PnlSnapshotEntity implements Persistable<String> {
 
   @Id
-  @Column(name = "snapshot_id")
+  @Column("snapshot_id")
   private String snapshotId;
 
-  @Column(name = "agent_id", nullable = false)
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "instrument_id", nullable = false)
+  @Column("instrument_id")
   private String instrumentId;
 
-  @Column(name = "snapshot_ts", nullable = false)
+  @Column("snapshot_ts")
   private Instant snapshotTs;
 
-  @Column(name = "unrealized_pnl", nullable = false, precision = 18, scale = 6)
+  @Column("unrealized_pnl")
   private BigDecimal unrealizedPnl;
 
-  @Column(name = "realized_pnl", nullable = false, precision = 18, scale = 6)
+  @Column("realized_pnl")
   private BigDecimal realizedPnl;
 
-  @Column(name = "net_pnl", nullable = false, precision = 18, scale = 6)
+  @Column("net_pnl")
   private BigDecimal netPnl;
 
-  @Column(name = "qty", nullable = false)
+  @Column("qty")
   private int qty;
 
-  @Column(name = "avg_cost", precision = 18, scale = 6)
+  @Column("avg_cost")
   private BigDecimal avgCost;
 
-  @Column(name = "created_at", nullable = false)
+  @Column("created_at")
   private Instant createdAt;
+
+  @Transient private boolean isNewEntity;
 
   protected PnlSnapshotEntity() {}
 
@@ -58,6 +59,7 @@ public class PnlSnapshotEntity {
     this.qty = qty;
     this.avgCost = avgCost;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getSnapshotId() { return snapshotId; }
@@ -70,4 +72,7 @@ public class PnlSnapshotEntity {
   public int getQty() { return qty; }
   public BigDecimal getAvgCost() { return avgCost; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return snapshotId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

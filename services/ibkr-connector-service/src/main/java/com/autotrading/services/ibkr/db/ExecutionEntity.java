@@ -2,54 +2,55 @@ package com.autotrading.services.ibkr.db;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 /**
- * JPA entity for the {@code executions} table.
+ * Aggregate for the {@code executions} table.
  * Each row represents a single broker fill (execution report).
  * The {@code exec_id} is globally unique and provides fill-level idempotency.
  */
-@Entity
-@Table(name = "executions")
-public class ExecutionEntity {
+@Table("executions")
+public class ExecutionEntity implements Persistable<String> {
 
   @Id
-  @Column(name = "exec_id")
+  @Column("exec_id")
   private String execId;
 
-  @Column(name = "order_intent_id", nullable = false)
+  @Column("order_intent_id")
   private String orderIntentId;
 
-  @Column(name = "broker_order_id")
+  @Column("broker_order_id")
   private String brokerOrderId;
 
-  @Column(name = "agent_id")
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "instrument_id")
+  @Column("instrument_id")
   private String instrumentId;
 
-  @Column(name = "side", nullable = false)
+  @Column("side")
   private String side;
 
-  @Column(name = "fill_qty", nullable = false)
+  @Column("fill_qty")
   private int fillQty;
 
-  @Column(name = "fill_price", nullable = false, precision = 18, scale = 6)
+  @Column("fill_price")
   private BigDecimal fillPrice;
 
-  @Column(name = "commission", precision = 18, scale = 6)
+  @Column("commission")
   private BigDecimal commission;
 
-  @Column(name = "fill_ts", nullable = false)
+  @Column("fill_ts")
   private Instant fillTs;
 
-  @Column(name = "created_at", nullable = false)
+  @Column("created_at")
   private Instant createdAt;
+
+  @Transient private boolean isNewEntity;
 
   protected ExecutionEntity() {}
 
@@ -68,6 +69,7 @@ public class ExecutionEntity {
     this.commission = commission;
     this.fillTs = fillTs;
     this.createdAt = createdAt;
+    this.isNewEntity = true;
   }
 
   public String getExecId() { return execId; }
@@ -81,4 +83,7 @@ public class ExecutionEntity {
   public BigDecimal getCommission() { return commission; }
   public Instant getFillTs() { return fillTs; }
   public Instant getCreatedAt() { return createdAt; }
+
+  @Override public String getId() { return execId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

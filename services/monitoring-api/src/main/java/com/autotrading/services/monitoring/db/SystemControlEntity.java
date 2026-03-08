@@ -1,30 +1,32 @@
 package com.autotrading.services.monitoring.db;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-@Entity
-@Table(name = "system_controls")
-public class SystemControlEntity {
+@Table("system_controls")
+public class SystemControlEntity implements Persistable<String> {
 
   @Id
-  @Column(name = "control_key")
+  @Column("control_key")
   private String controlKey;
 
-  @Column(name = "control_value", nullable = false)
+  @Column("control_value")
   private String controlValue;
 
-  @Column(name = "actor_id", nullable = false)
+  @Column("actor_id")
   private String actorId;
 
-  @Column(name = "trace_id", nullable = false)
+  @Column("trace_id")
   private String traceId;
 
-  @Column(name = "updated_at", nullable = false)
+  @Column("updated_at")
   private Instant updatedAt;
+
+  @Transient private boolean isNewEntity;
 
   protected SystemControlEntity() {}
 
@@ -35,6 +37,7 @@ public class SystemControlEntity {
     this.actorId = actorId;
     this.traceId = traceId;
     this.updatedAt = updatedAt;
+    this.isNewEntity = true;
   }
 
   public String getControlKey() { return controlKey; }
@@ -47,4 +50,7 @@ public class SystemControlEntity {
   public void setActorId(String actorId) { this.actorId = actorId; }
   public void setTraceId(String traceId) { this.traceId = traceId; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+  @Override public String getId() { return controlKey; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

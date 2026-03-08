@@ -1,52 +1,53 @@
 package com.autotrading.services.ibkr.db;
 
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "broker_orders")
-public class BrokerOrderEntity {
+@Table("broker_orders")
+public class BrokerOrderEntity implements Persistable<String> {
 
   @Id
-  @Column(name = "broker_order_id")
+  @Column("broker_order_id")
   private String brokerOrderId;
 
-  @Column(name = "order_intent_id", nullable = false)
+  @Column("order_intent_id")
   private String orderIntentId;
 
-  @Column(name = "order_ref", nullable = false, unique = true)
+  @Column("order_ref")
   private String orderRef;
 
-  @Column(name = "perm_id", unique = true)
+  @Column("perm_id")
   private String permId;
 
-  @Column(name = "agent_id", nullable = false)
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "instrument_id")
+  @Column("instrument_id")
   private String instrumentId;
 
-  @Column(name = "side", nullable = false)
+  @Column("side")
   private String side;
 
-  @Column(name = "qty", nullable = false)
+  @Column("qty")
   private int qty;
 
-  @Column(name = "order_type", nullable = false)
+  @Column("order_type")
   private String orderType;
 
-  @Column(name = "status", nullable = false)
+  @Column("status")
   private String status;
 
-  @Column(name = "submitted_at", nullable = false)
+  @Column("submitted_at")
   private Instant submittedAt;
 
-  @Column(name = "updated_at", nullable = false)
+  @Column("updated_at")
   private Instant updatedAt;
+
+  @Transient private boolean isNewEntity;
 
   protected BrokerOrderEntity() {}
 
@@ -66,6 +67,7 @@ public class BrokerOrderEntity {
     this.status = status;
     this.submittedAt = submittedAt;
     this.updatedAt = updatedAt;
+    this.isNewEntity = true;
   }
 
   public String getBrokerOrderId() { return brokerOrderId; }
@@ -83,4 +85,7 @@ public class BrokerOrderEntity {
 
   public void setStatus(String status) { this.status = status; }
   public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+  @Override public String getId() { return brokerOrderId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

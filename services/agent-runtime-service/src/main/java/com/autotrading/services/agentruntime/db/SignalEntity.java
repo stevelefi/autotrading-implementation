@@ -1,53 +1,50 @@
 package com.autotrading.services.agentruntime.db;
 
 import java.time.Instant;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.domain.Persistable;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
-@Entity
-@Table(name = "signals")
-public class SignalEntity {
+@Table("signals")
+public class SignalEntity implements Persistable<String> {
 
   @Id
-  @Column(name = "signal_id")
+  @Column("signal_id")
   private String signalId;
 
-  @Column(name = "trade_event_id", nullable = false)
+  @Column("trade_event_id")
   private String tradeEventId;
 
-  @Column(name = "agent_id", nullable = false)
+  @Column("agent_id")
   private String agentId;
 
-  @Column(name = "instrument_id")
+  @Column("instrument_id")
   private String instrumentId;
 
-  @Column(name = "idempotency_key", nullable = false, unique = true)
+  @Column("idempotency_key")
   private String idempotencyKey;
 
-  @Column(name = "source_type", nullable = false)
+  @Column("source_type")
   private String sourceType = "AGENT_RUNTIME";
 
-  @Column(name = "source_event_id")
+  @Column("source_event_id")
   private String sourceEventId;
 
-  @Column(name = "origin_source_type", nullable = false)
+  @Column("origin_source_type")
   private String originSourceType;
 
-  @Column(name = "origin_source_event_id")
+  @Column("origin_source_event_id")
   private String originSourceEventId;
 
-  @JdbcTypeCode(SqlTypes.JSON)
-  @Column(name = "raw_payload_json", nullable = false, columnDefinition = "jsonb")
+  @Column("raw_payload_json")
   private String rawPayloadJson;
 
-  @Column(name = "signal_ts", nullable = false)
+  @Column("signal_ts")
   private Instant signalTs;
+
+  @Transient private boolean isNewEntity;
 
   protected SignalEntity() {}
 
@@ -66,6 +63,7 @@ public class SignalEntity {
     this.originSourceEventId = originSourceEventId;
     this.rawPayloadJson = rawPayloadJson;
     this.signalTs = signalTs;
+    this.isNewEntity = true;
   }
 
   public String getSignalId() { return signalId; }
@@ -79,4 +77,7 @@ public class SignalEntity {
   public String getOriginSourceEventId() { return originSourceEventId; }
   public String getRawPayloadJson() { return rawPayloadJson; }
   public Instant getSignalTs() { return signalTs; }
+
+  @Override public String getId() { return signalId; }
+  @Override public boolean isNew() { return isNewEntity; }
 }

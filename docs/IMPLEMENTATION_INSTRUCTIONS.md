@@ -26,7 +26,14 @@ Production-standard workflow for implementing and shipping changes in this repos
 
 ## 2. Branch and PR Standard
 
-1. Branch naming: `codex/<repo>-<issue>-<short-topic>`
+1. Branch naming follows GitHub flow — validate with `python3 scripts/branch_check.py`:
+   - `feature/<short-topic>` — new capability
+   - `bugfix/<short-topic>` — defect fix
+   - `hotfix/<short-topic>` — urgent production fix
+   - `chore/<short-topic>` — tooling, deps, docs, config
+   - `release/<version>` — release preparation
+   - `AT-<ticket-id>-<short-topic>` — Jira-linked work
+   - **Never commit directly to `main`.**
 2. Every PR must include:
    - Linked issue (`Closes #<id>` / `Fixes #<id>` / `Resolves #<id>`)
    - Pinned spec ref
@@ -136,3 +143,137 @@ When implementation changes observable behavior, update:
 - `reports/blitz/known-risks.md`
 - Relevant runbook entries in `docs/runbooks/`
 - Include generated smoke report paths as evidence links in the PR
+
+---
+
+## 7. Java / Spring Boot / Spring Data JDBC Standards
+
+### Java 21
+- Use records for DTOs and value objects; prefer switch expressions over if-else chains.
+- Never swallow exceptions with empty `catch` blocks — at minimum log with MDC context.
+- Declare thread-safety intent explicitly: `volatile`, `CopyOnWriteArrayList`, `ConcurrentHashMap.compute()`.
+
+### Spring Boot 3
+- Constructor injection only — never `@Autowired` on fields.
+- Declare all beans in `@Configuration` classes.
+- `@Transactional` belongs on the service layer only.
+- Post-commit Kafka publishes use `TransactionSynchronizationManager.registerSynchronization()`.
+- Group config with `@ConfigurationProperties`-bound classes.
+
+### Spring Data JDBC
+This codebase uses **Spring Data JDBC** (not JPA). Key rules:
+
+1. **`Persistable<String>` on every entity with a String PK** — set `isNewEntity = true` in
+   the constructor used for creates; leave it `false` on the no-arg constructor used by JDBC reads.
+   Without this, `save()` attempts `UPDATE` instead of `INSERT` and throws
+   `IncorrectUpdateSemanticsDataAccessException`.
+
+2. **Declare JSON blob columns as `TEXT` in Flyway** — never `jsonb`. PostgreSQL rejects
+   `varchar → jsonb` at runtime. All jsonb columns were converted in `V7__jsonb_columns_to_text.sql`.
+
+3. **Always annotate `@Table("table_name")` and `@Column("col_name")`** — do not rely on
+   Spring Data naming conventions.
+
+4. **Upsert via `NamedParameterJdbcTemplate`** — `save()` cannot express `ON CONFLICT DO UPDATE`;
+   write explicit SQL with `:named` parameters.
+
+5. **Match PostgreSQL dependency scope to `compile`** in `pom.xml` — `runtime` scope hides
+   `PGobject` at compile time.
+
+---
+
+## 8. PostgreSQL Database Design Standards
+
+### Schema Conventions
+
+| Element | Convention |
+|---------|------------|
+| Primary keys | `TEXT` (`"prefix-" + UUID`) |
+| Timestamps | `TIMESTAMPTZ` always |
+| JSON blobs | `TEXT` (not `jsonb`) |
+| Strings | `TEXT` — avoid `VARCHAR(n)` unless hard domain constraint |
+| Booleans | `BOOLEAN NOT NULL DEFAULT FALSE` |
+| Enums | `TEXT NOT NULL` (store name, not ordinal) |
+| Foreign keys | `REFERENCES` without `ON DELETE CASCADE` by default |
+
+**Naming:** tables plural snake_case; PKs `<entity>_id`; timestamps `<event>_at`;
+JSON columns `<field>_json`; indexes `idx_<table>_<cols>`.
+
+### Flyway Discipline
+1. New file: `db/migrations/V<max+1>__<desc>.sql` — header comment `-- V<n>: <reason>`.
+2. Migrations are **immutable** once merged — never edit an existing file.
+3. All DDL must use `IF NOT EXISTS` / `IF EXISTS` guards.
+4. After every new migration: `stack.py down` → `stack.py infra-up` → check `docker logs flyway-init-1` → `smoke_local.py`.
+5. Destructive changes use two-phase rollout: Phase 1 — stop using column; Phase 2 — `DROP COLUMN IF EXISTS`.
+
+### SQL Standards
+- Explicit column lists in every `INSERT`.
+- CTEs for multi-step logic; no deeply nested subqueries.
+- Upsert: `ON CONFLICT (id) DO UPDATE SET col = EXCLUDED.col`.
+- `EXPLAIN ANALYZE` before merging queries on large tables.
+- Never `SELECT *`.
+- Index every FK, every `WHERE`/`ORDER BY`/`JOIN` column on hot paths.
+- Stored procedures: use `CREATE OR REPLACE FUNCTION fn_<verb>_<noun>` sparingly;
+  business logic belongs in Java, not the database.
+
+### Production Safety Checklist
+- [ ] All DDL uses `IF NOT EXISTS` / `IF EXISTS` guards
+- [ ] No `DROP TABLE` / `DROP COLUMN` without two-phase plan
+- [ ] Flyway `docker logs flyway-init-1` shows clean apply
+- [ ] `python3 scripts/smoke_local.py` exits 0 post-migration
+- [ ] PR includes smoke report path as evidence
+
+---
+
+## 9. DevOps Workflow Standards
+
+### Starting Work
+```bash
+git checkout main && git pull
+git checkout -b feature/<short-topic>   # or bugfix/, hotfix/, chore/, AT-<id>-
+python3 scripts/branch_check.py         # must print OK
+```
+
+### Before Every Commit
+```bash
+python3 scripts/check.py --fast         # rapid iteration (skips e2e)
+python3 scripts/check.py                # full gate before final commit — all ✅ required
+```
+
+### Before Opening a PR
+```bash
+python3 scripts/stack.py up
+python3 scripts/smoke_local.py          # must exit 0
+python3 scripts/stack.py down
+```
+For large or cross-cutting changes (new service, DB migration, Helm, contract): `python3 scripts/stack.py ci`.
+
+### Commit Message Format
+`<type>(<scope>): <imperative summary>`
+
+Types: `feat`, `fix`, `refactor`, `test`, `chore`, `docs`, `ci`, `perf`.
+One logical concern per commit. Run `git diff --staged` before committing.
+
+### Pre-Push Checklist
+- [ ] `python3 scripts/branch_check.py` prints OK
+- [ ] `python3 scripts/check.py` — all ✅
+- [ ] `python3 scripts/smoke_local.py` exits 0 (runtime-touching changes)
+- [ ] No secrets, `target/` outputs, or `.env` files staged
+- [ ] PR body: smoke report path + linked issue + pinned spec ref + acceptance checklist
+
+### Helm Changes
+```bash
+helm lint infra/helm/charts/trading-service
+helm template trading-service infra/helm/charts/trading-service \
+  -f infra/helm/charts/trading-service/values.yaml > /dev/null
+```
+Never hard-code image tags in `values.yaml`. Do not bleed docker-compose config into Helm.
+
+### Migration Safety
+After every Flyway migration file:
+```bash
+python3 scripts/stack.py down
+python3 scripts/stack.py infra-up
+docker logs flyway-init-1 2>&1 | tail -20   # must show "Successfully applied N migrations"
+python3 scripts/smoke_local.py
+```

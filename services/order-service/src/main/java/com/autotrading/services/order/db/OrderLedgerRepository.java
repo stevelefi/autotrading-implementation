@@ -1,5 +1,5 @@
 package com.autotrading.services.order.db;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.ListCrudRepository;
 
-public interface OrderLedgerRepository extends JpaRepository<OrderLedgerEntity, String> {}
+public interface OrderLedgerRepository extends ListCrudRepository<OrderLedgerEntity, String> {}

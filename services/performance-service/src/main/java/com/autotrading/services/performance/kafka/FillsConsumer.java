@@ -88,8 +88,7 @@ public class FillsConsumer {
         Instant now = Instant.now();
 
         // Upsert position in DB
-        PositionEntity.PositionId posId = new PositionEntity.PositionId(finalAgentId, instrumentId);
-        PositionEntity posEntity = positionRepository.findById(posId)
+        PositionEntity posEntity = positionRepository.findByAgentIdAndInstrumentId(finalAgentId, instrumentId)
             .orElseGet(() -> new PositionEntity(finalAgentId, instrumentId, 0, BigDecimal.ZERO, BigDecimal.ZERO, now));
         posEntity.setQty(snapshot.netQty());
         posEntity.setAvgCost(snapshot.avgCost());
