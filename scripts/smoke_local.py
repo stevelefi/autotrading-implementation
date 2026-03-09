@@ -243,6 +243,9 @@ def main() -> int:
         broker_before = http_json("GET", f"{broker_url}/internal/smoke/stats")
         risk_first = http_json("POST", f"{risk_url}/internal/smoke/command-path", risk_payload)
         risk_second = http_json("POST", f"{risk_url}/internal/smoke/command-path", risk_payload)
+        # Risk fires the order call asynchronously (fire-and-forget FutureStub), so poll
+        # the broker stats rather than reading them immediately after risk returns.
+        broker_after_count = wait_for_broker_submit_delta(broker_url, broker_before_count, timeout_sec=15)
         broker_stats = http_json("GET", f"{broker_url}/internal/smoke/stats")
 
         details["steps"]["command_path"] = {
@@ -256,7 +259,6 @@ def main() -> int:
         ensure(risk_second.status == 200, f"expected risk second status 200, got {risk_second.status}")
         ensure(get_nested(risk_first.body_json, "decision") == "DECISION_ALLOW", "expected risk first decision ALLOW")
         ensure(get_nested(risk_second.body_json, "decision") == "DECISION_ALLOW", "expected risk second decision ALLOW")
-        broker_after_count = int(get_nested(broker_stats.body_json, "total_submit_count") or 0)
         submit_count_delta = broker_after_count - broker_before_count
         ensure(submit_count_delta == 1, f"expected broker submit delta 1 after retry, got {submit_count_delta}")
         summaries.append("Risk->Order->Broker command path retry dedupe passed")

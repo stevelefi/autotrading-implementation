@@ -110,7 +110,7 @@ class MandatoryScenariosTest {
   }
 
   private RiskDecisionGrpcService newRiskService(
-      OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub) {
+      OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderStub) {
     return new RiskDecisionGrpcService(
         orderStub, new SimplePolicyEngine(),
         mock(RiskDecisionRepository.class),
@@ -142,7 +142,7 @@ class MandatoryScenariosTest {
     orderChannel = InProcessChannelBuilder.forName(orderName).directExecutor().build();
 
     RiskDecisionGrpcService riskImpl = newRiskService(
-        OrderCommandServiceGrpc.newBlockingStub(orderChannel));
+        OrderCommandServiceGrpc.newFutureStub(orderChannel));
     String riskName = InProcessServerBuilder.generateName();
     riskServer = InProcessServerBuilder.forName(riskName).directExecutor()
         .addService(riskImpl).build().start();

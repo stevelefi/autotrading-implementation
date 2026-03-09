@@ -37,8 +37,8 @@ public class RiskRuntimeConfiguration {
   }
 
   @Bean
-  OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderCommandStub(ManagedChannel orderGrpcChannel) {
-    return OrderCommandServiceGrpc.newBlockingStub(orderGrpcChannel);
+  OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderCommandStub(ManagedChannel orderGrpcChannel) {
+    return OrderCommandServiceGrpc.newFutureStub(orderGrpcChannel);
   }
 
   @Bean
@@ -48,7 +48,7 @@ public class RiskRuntimeConfiguration {
 
   @Bean
   RiskDecisionGrpcService riskDecisionGrpcService(
-      OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub,
+      OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderStub,
       SimplePolicyEngine policyEngine,
       RiskDecisionRepository riskDecisionRepository,
       PolicyDecisionLogRepository policyDecisionLogRepository,

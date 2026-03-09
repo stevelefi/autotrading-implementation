@@ -34,7 +34,7 @@ class RiskDecisionGrpcServiceTest {
 
     private Server         orderServer;
     private ManagedChannel orderChannel;
-    private OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub;
+    private OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderStub;
 
     private final SimplePolicyEngine policyEngine = new SimplePolicyEngine();
 
@@ -54,7 +54,7 @@ class RiskDecisionGrpcServiceTest {
                 .build()
                 .start();
         orderChannel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
-        orderStub    = OrderCommandServiceGrpc.newBlockingStub(orderChannel);
+        orderStub    = OrderCommandServiceGrpc.newFutureStub(orderChannel);
     }
 
     @AfterEach
