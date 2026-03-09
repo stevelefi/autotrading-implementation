@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.autotrading.command.v1.CancelOrderRequest;
 import com.autotrading.command.v1.CancelOrderResponse;
@@ -22,13 +23,14 @@ import com.autotrading.libs.idempotency.ClaimOutcome;
 import com.autotrading.libs.idempotency.ClaimResult;
 import com.autotrading.libs.idempotency.IdempotencyClaim;
 import com.autotrading.libs.idempotency.IdempotencyService;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
+import com.autotrading.services.ibkr.client.IbkrHealthProbe;
+import com.autotrading.services.ibkr.client.IbkrRestClient;
 import com.autotrading.services.ibkr.db.BrokerOrderEntity;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionEntity;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
-import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Core broker connector engine.
@@ -46,6 +48,9 @@ public class BrokerConnectorEngine {
   private final ExecutionRepository executionRepository;
   private final DirectKafkaPublisher bestEffortPublisher;
   private final ObjectMapper objectMapper;
+  private final IbkrHealthProbe healthProbe;
+  private final IbkrRestClient restClient;
+  private final boolean simulatorMode;
   private final Map<String, SubmitOrderResponse> submitReplay = new ConcurrentHashMap<>();
   private final Map<String, AtomicInteger> submitCountsByOrderIntent = new ConcurrentHashMap<>();
   private final Set<String> seenExecIds = ConcurrentHashMap.newKeySet();
@@ -54,16 +59,33 @@ public class BrokerConnectorEngine {
                                 BrokerOrderRepository brokerOrderRepository,
                                 ExecutionRepository executionRepository,
                                 DirectKafkaPublisher bestEffortPublisher,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                IbkrHealthProbe healthProbe,
+                                IbkrRestClient restClient,
+                                boolean simulatorMode) {
     this.idempotencyService = idempotencyService;
     this.brokerOrderRepository = brokerOrderRepository;
     this.executionRepository = executionRepository;
     this.bestEffortPublisher = bestEffortPublisher;
     this.objectMapper = objectMapper;
+    this.healthProbe = healthProbe;
+    this.restClient = restClient;
+    this.simulatorMode = simulatorMode;
   }
 
   @Transactional
   public SubmitOrderResponse submit(SubmitOrderRequest request) {
+    // Guard: reject immediately if broker is unreachable (REST mode only)
+    if (!simulatorMode && !healthProbe.isUp()) {
+      log.warn("ibkr submit rejected — broker unavailable orderIntentId={}", request.getOrderIntentId());
+      return SubmitOrderResponse.newBuilder()
+          .setTraceId(request.getRequestContext().getTraceId())
+          .setStatus(CommandStatus.COMMAND_STATUS_FAILED)
+          .setBrokerSubmitId("")
+          .setSubmittedAt(Instant.now().toString())
+          .build();
+    }
+
     // Namespace the key so ibkr-connector does not collide with upstream services
     // (risk, order) that also claim the same idempotency key in the shared table.
     String key = "ibkr:" + request.getRequestContext().getIdempotencyKey();
@@ -91,6 +113,36 @@ public class BrokerConnectorEngine {
     Instant now = Instant.now();
     submitCountsByOrderIntent.computeIfAbsent(request.getOrderIntentId(), ignored -> new AtomicInteger()).incrementAndGet();
 
+    // Real REST path: call IBKR CP API and capture the broker's native order ID as permId
+    Long ibkrOrderId = null;
+    if (!simulatorMode) {
+      try {
+        var ibkrResponses = restClient.submitOrder(
+            null,                          // conid — will be resolved from instrumentId in future
+            request.getSide(),
+            (int) request.getQty(),
+            request.getOrderType(),
+            request.getTimeInForce(),
+            request.getInstrumentId(),
+            orderRef);
+        if (ibkrResponses != null && !ibkrResponses.isEmpty()) {
+          ibkrOrderId = ibkrResponses.get(0).orderId();
+          log.info("ibkr REST submit returned ibkrOrderId={} orderIntentId={}",
+              ibkrOrderId, request.getOrderIntentId());
+        }
+      } catch (Exception e) {
+        log.error("ibkr REST submitOrder failed orderIntentId={} cause={}",
+            request.getOrderIntentId(), e.getMessage(), e);
+        // Surface as FAILED so order-service can set CIRCUIT_OPEN
+        return SubmitOrderResponse.newBuilder()
+            .setTraceId(request.getRequestContext().getTraceId())
+            .setStatus(CommandStatus.COMMAND_STATUS_FAILED)
+            .setBrokerSubmitId("")
+            .setSubmittedAt(now.toString())
+            .build();
+      }
+    }
+
     SubmitOrderResponse response = SubmitOrderResponse.newBuilder()
         .setTraceId(request.getRequestContext().getTraceId())
         .setStatus(CommandStatus.COMMAND_STATUS_ACCEPTED)
@@ -102,12 +154,13 @@ public class BrokerConnectorEngine {
     idempotencyService.markCompleted(key, brokerSubmitId);
 
     // Persist broker order, then publish order status directly to Kafka
+    final Long permId = ibkrOrderId;
     try {
       brokerOrderRepository.save(new BrokerOrderEntity(
           brokerSubmitId,
           request.getOrderIntentId(),
           orderRef,
-          null,
+          permId != null ? permId.toString() : null,
           request.getAgentId(),
           request.getInstrumentId().isBlank() ? null : request.getInstrumentId(),
           request.getSide(),

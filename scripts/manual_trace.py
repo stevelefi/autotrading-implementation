@@ -287,19 +287,37 @@ def check_and_reset_order_service(args: argparse.Namespace) -> str | None:
 # Step 4 — Pipeline watch
 # ---------------------------------------------------------------------------
 
-def watch_pipeline(args: argparse.Namespace) -> bool:
+def snapshot_broker_count(args: argparse.Namespace) -> int | None:
+    """Capture broker submit count BEFORE sending the event to avoid race conditions."""
+    status, body = _http_get(args.broker_stats)
+    if status == 0:
+        return None
+    return body.get("total_submit_count", 0)
+
+
+def watch_pipeline(args: argparse.Namespace, pre_send_count: int | None = None) -> bool:
     _print_section("Pipeline Watch — Waiting for IBKR Submit")
     print(f"  Polling: {args.broker_stats}")
     print(f"  Timeout: {PIPELINE_TIMEOUT_S}s (polling every {PIPELINE_POLL_S}s)\n")
 
-    # Capture baseline count
-    status, baseline = _http_get(args.broker_stats)
-    if status == 0:
-        print("  [ERROR] Could not reach broker stats endpoint. Is the stack running?")
-        return False
+    # Use pre-send snapshot if available; otherwise fall back to a fresh query.
+    # The pre-send snapshot avoids a race where a fast pipeline (< ~200ms) completes
+    # before this baseline query runs, causing the watch to miss the increment.
+    if pre_send_count is not None:
+        baseline_count = pre_send_count
+        print(f"  Baseline total_submit_count: {baseline_count}  (captured before send)")
+    else:
+        status, baseline = _http_get(args.broker_stats)
+        if status == 0:
+            print("  [ERROR] Could not reach broker stats endpoint. Is the stack running?")
+            return False
+        baseline_count = baseline.get("total_submit_count", 0)
+        print(f"  Baseline total_submit_count: {baseline_count}")
 
-    baseline_count = baseline.get("total_submit_count", 0)
-    print(f"  Baseline total_submit_count: {baseline_count}")
+    # Diagnostic thresholds: check trading mode after 15s of no movement
+    DIAG_AFTER_S   = 15
+    diag_done      = False
+    start_time     = time.time()
 
     deadline = time.time() + PIPELINE_TIMEOUT_S
     attempt  = 0
@@ -311,13 +329,42 @@ def watch_pipeline(args: argparse.Namespace) -> bool:
             print(f"  [{attempt:>3}] Broker stats unreachable, retrying...")
             continue
         current = stats.get("total_submit_count", 0)
-        elapsed = int(PIPELINE_TIMEOUT_S - (deadline - time.time()))
+        elapsed = int(time.time() - start_time)
         print(f"  [{attempt:>3}] total_submit_count={current}  (+{current - baseline_count})  [{elapsed}s elapsed]")
         if current > baseline_count:
             print(f"\n  [PASS] Pipeline confirmed: IBKR submit count incremented to {current}.")
             return True
 
+        # Mid-poll diagnostic after DIAG_AFTER_S with no movement
+        if not diag_done and elapsed >= DIAG_AFTER_S:
+            diag_done = True
+            print(f"\n  [DIAG] Count unchanged for {elapsed}s — running diagnostics...")
+            # Check trading mode
+            m_status, m_body = _http_get(f"{args.monitoring_url}/api/v1/system/consistency-status")
+            if m_status == 200:
+                trading_mode = m_body.get("trading_mode", "UNKNOWN")
+                kill_switch  = m_body.get("kill_switch", "?")
+                marker = " <-- orders blocked!" if trading_mode == "FROZEN" else ""
+                print(f"  [DIAG] trading_mode={trading_mode}  kill_switch={kill_switch}{marker}")
+                if trading_mode == "FROZEN":
+                    print("  [DIAG] Hint: 60s inactivity watchdog re-fired after reset.")
+                    print("         Fix: POST http://localhost:18082/internal/smoke/reset to unfreeze,")
+                    print("         then re-run with a fresh idempotency key.")
+            else:
+                print(f"  [DIAG] monitoring-api unreachable (HTTP {m_status})")
+            # Check broker stats raw for extra context
+            _, broker = _http_get(args.broker_stats)
+            if broker:
+                extra = {k: v for k, v in broker.items() if k != "total_submit_count"}
+                if extra:
+                    print(f"  [DIAG] broker stats extra fields: {extra}")
+            print()
+
     print(f"\n  [FAIL] Timed out after {PIPELINE_TIMEOUT_S}s — IBKR submit count did not increase.")
+    print("  Possible causes:")
+    print("    1. trading_mode=FROZEN (60s watchdog re-fired) — POST /internal/smoke/reset on order-service")
+    print("    2. Risk denial — check event-processor / risk-service logs: python3 scripts/trace.py --service risk-service")
+    print("    3. Kafka consumer lag — check Redpanda console: http://localhost:8081")
     return False
 
 # ---------------------------------------------------------------------------
@@ -356,6 +403,11 @@ def main() -> None:
 
     print(f"\nautotrading manual-trace  |  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+    # Capture broker baseline BEFORE sending so a sub-200ms pipeline doesn't race past it
+    pre_send_count = None
+    if not args.skip_pipeline_watch:
+        pre_send_count = snapshot_broker_count(args)
+
     # 1. Send event
     status, body = send_event(args)
 
@@ -374,7 +426,7 @@ def main() -> None:
     pipeline_ok = None
     if not args.skip_pipeline_watch:
         if status in (200, 202):
-            pipeline_ok = watch_pipeline(args)
+            pipeline_ok = watch_pipeline(args, pre_send_count=pre_send_count)
         else:
             print("\n  [SKIP] Pipeline watch skipped (event not accepted).")
 

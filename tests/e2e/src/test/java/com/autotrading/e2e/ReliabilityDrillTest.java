@@ -1,13 +1,17 @@
 package com.autotrading.e2e;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.kafka.DirectKafkaPublisher;
-import com.autotrading.services.ibkr.db.BrokerOrderRepository;
-import com.autotrading.services.ibkr.db.ExecutionRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import com.autotrading.libs.reliability.inbox.ConsumerDeduper;
 import com.autotrading.libs.reliability.inbox.InMemoryConsumerInboxRepository;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
@@ -16,10 +20,9 @@ import com.autotrading.libs.reliability.outbox.OutboxDispatcher;
 import com.autotrading.libs.reliability.outbox.OutboxEvent;
 import com.autotrading.libs.reliability.outbox.OutboxStatus;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import org.junit.jupiter.api.Test;
+import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class ReliabilityDrillTest {
 
@@ -60,9 +63,15 @@ class ReliabilityDrillTest {
     assertThat(sideEffects).containsExactly("applied");
     assertThat(metrics.duplicateSuppressionCount()).isEqualTo(1);
 
+    BrokerOrderRepository mockBrokerRepo = mock(BrokerOrderRepository.class);
+    lenient().when(mockBrokerRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    com.autotrading.services.ibkr.client.IbkrHealthProbe mockProbe =
+        mock(com.autotrading.services.ibkr.client.IbkrHealthProbe.class);
+    lenient().when(mockProbe.isUp()).thenReturn(true);
     BrokerConnectorEngine connectorEngine = new BrokerConnectorEngine(
-        new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
-        mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper());
+        new InMemoryIdempotencyService(), mockBrokerRepo,
+        mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper(),
+        mockProbe, mock(com.autotrading.services.ibkr.client.IbkrRestClient.class), true);
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isTrue();
     assertThat(connectorEngine.recordExecution("exec-drill-1")).isFalse();
   }

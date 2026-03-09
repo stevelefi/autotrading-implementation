@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/v1/api/iserver/order/[^/]+"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": [
+      {
+        "order_id": 10001,
+        "order_status": "Submitted",
+        "encrypt_message": "1"
+      }
+    ]
+  }
+}
