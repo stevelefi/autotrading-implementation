@@ -31,6 +31,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / "infra/local/.env.compose.example"
 COMPOSE_FILE = ROOT / "infra/local/docker-compose.yml"
+# Local-dev overlay: uses Dockerfile.local (no Maven inside Docker)
+COMPOSE_LOCAL_FILE = ROOT / "infra/local/docker-compose.local.yml"
 
 INFRA_SERVICES = [
     "postgres",
@@ -65,9 +67,28 @@ BASE_CMD = [
     "-f", str(COMPOSE_FILE),
 ]
 
+# Build command: applies docker-compose.local.yml on top so services use
+# Dockerfile.local (just copies the pre-built JAR — no Maven in Docker).
+BUILD_CMD = [
+    "docker", "compose",
+    "--env-file", str(ENV_FILE),
+    "-f", str(COMPOSE_FILE),
+    "-f", str(COMPOSE_LOCAL_FILE),
+]
+
 
 def compose(*args: str, check: bool = True) -> int:
     cmd = BASE_CMD + list(args)
+    print(f"\n$ {' '.join(cmd)}", flush=True)
+    result = subprocess.run(cmd, cwd=ROOT)
+    if check and result.returncode != 0:
+        sys.exit(result.returncode)
+    return result.returncode
+
+
+def compose_build(*args: str, check: bool = True) -> int:
+    """Like compose() but uses the local override (Dockerfile.local)."""
+    cmd = BUILD_CMD + list(args)
     print(f"\n$ {' '.join(cmd)}", flush=True)
     result = subprocess.run(cmd, cwd=ROOT)
     if check and result.returncode != 0:
@@ -114,16 +135,35 @@ def cmd_down() -> None:
     compose("down", "-v")
 
 
-def cmd_build() -> None:
-    banner("Building application images")
-    compose("build", *APP_SERVICES)
+def cmd_build(services: list[str] | None = None) -> None:
+    targets = services or APP_SERVICES
+    banner(f"Building: {', '.join(targets)}")
+
+    # Step 1: Maven build on the host — uses ~/.m2 cache, only recompiles
+    # changed modules.  -am also rebuilds any libs/* the service depends on.
+    mvn_modules = ",".join(f"services/{s}" for s in targets)
+    mvn_cmd = [
+        "mvn", "-B",
+        "-pl", mvn_modules,
+        "-am", "-DskipTests", "package",
+    ]
+    print(f"\n$ {' '.join(mvn_cmd)}", flush=True)
+    result = subprocess.run(mvn_cmd, cwd=ROOT)
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+    # Step 2: Docker builds — each service just copies the pre-built JAR.
+    # OTel layer is cached after first run; subsequent builds finish in ~1s/service.
+    compose_build("build", *targets)
 
 
-def cmd_restart_app() -> None:
-    banner("Restarting application services (infra stays up)")
-    cmd_app_down()
-    cmd_build()
-    cmd_app_up()
+def cmd_restart_app(services: list[str] | None = None) -> None:
+    targets = services or APP_SERVICES
+    banner(f"Restarting: {', '.join(targets)} (infra stays up)")
+    compose("stop", *targets)
+    compose("rm", "-f", *targets)
+    cmd_build(targets)
+    compose_build("up", "-d", "--no-deps", *targets)
 
 
 def cmd_status() -> None:
@@ -192,8 +232,22 @@ def main() -> None:
             "status", "logs", "validate", "ci",
         ],
     )
-    parser.add_argument("--service", help="Service name (used with logs)")
+    parser.add_argument(
+        "--service",
+        action="append",
+        dest="services",
+        metavar="SERVICE",
+        help=(
+            "Target a specific service (repeatable). "
+            "Used with: build, restart-app, logs. "
+            "Example: --service risk-service --service order-service"
+        ),
+    )
     args = parser.parse_args()
+
+    # --service as a single name also supported for logs (legacy)
+    svc_list: list[str] | None = args.services or None
+    svc_single: str | None = svc_list[0] if svc_list and len(svc_list) == 1 else None
 
     dispatch = {
         "infra-up":    cmd_infra_up,
@@ -202,10 +256,10 @@ def main() -> None:
         "app-down":    cmd_app_down,
         "up":          cmd_up,
         "down":        cmd_down,
-        "build":       cmd_build,
-        "restart-app": cmd_restart_app,
+        "build":       lambda: cmd_build(svc_list),
+        "restart-app": lambda: cmd_restart_app(svc_list),
         "status":      cmd_status,
-        "logs":        lambda: cmd_logs(args.service),
+        "logs":        lambda: cmd_logs(svc_single),
         "validate":    cmd_validate,
         "ci":          cmd_ci,
     }

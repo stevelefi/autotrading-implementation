@@ -64,19 +64,24 @@ class LogEntry:
 
 def _build_logql(args: argparse.Namespace) -> str:
     """Build a LogQL stream selector + filter expression from CLI args."""
-    # Stream selector
-    labels: dict[str, str] = {"compose_project": "autotrading"}
+    # Stream selector — OTel OTLP-ingested logs use service_name as a Loki stream label.
+    # trace_id is stored as Loki structured metadata (not a stream label), so it cannot
+    # appear in the stream selector; use the | trace_id = "VALUE" filter instead.
     if args.service:
-        labels["service"] = args.service
+        query = f'{{service_name="{args.service}"}}'
+    else:
+        query = '{service_name=~".+"}'
 
-    label_str = ",".join(f'{k}="{v}"' for k, v in labels.items())
-    query = "{" + label_str + "}"
-
-    # Line filters (|= "key=value")
-    filters: list[str] = []
-
+    # Structured metadata filters (Loki 3.x OTLP path)
+    # trace_id, span_id, etc. are promoted as structured metadata by the OTLP ingest
+    struct_filters: list[str] = []
     if args.trace_id:
-        filters.append(f"trace_id={args.trace_id}")
+        struct_filters.append(f'trace_id = "{args.trace_id}"')
+    for sf in struct_filters:
+        query += f" | {sf}"
+
+    # Line filters (|= "key=value") — for MDC fields embedded in log line text
+    filters: list[str] = []
     if args.idempotency_key:
         filters.append(f"idempotency_key={args.idempotency_key}")
     if args.agent_id:
@@ -90,7 +95,9 @@ def _build_logql(args: argparse.Namespace) -> str:
     if args.request_id:
         filters.append(f"request_id={args.request_id}")
 
-    if not filters:
+    # Warn only if broad stream selector and no metadata/line filters to narrow results
+    is_unbounded = (not args.service and not args.trace_id)
+    if is_unbounded and not filters:
         print("[trace.py] WARNING: no filters specified — querying all logs. Add at least one flag.", file=sys.stderr)
 
     for f in filters:
@@ -153,7 +160,7 @@ def _fetch_entries(args: argparse.Namespace) -> list[LogEntry]:
 
     entries: list[LogEntry] = []
     for stream in streams:
-        service = stream.get("stream", {}).get("service", "unknown")
+        service = stream.get("stream", {}).get("service_name", "unknown")
         for ts_str, line in stream.get("values", []):
             entries.append(LogEntry(ts_ns=int(ts_str), service=service, line=line))
 

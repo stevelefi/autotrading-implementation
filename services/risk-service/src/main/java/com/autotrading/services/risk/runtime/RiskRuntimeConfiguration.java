@@ -32,8 +32,10 @@ public class RiskRuntimeConfiguration {
   @Bean(destroyMethod = "shutdownNow")
   ManagedChannel orderGrpcChannel(
       @Value("${order.grpc.host:order-service}") String host,
-      @Value("${order.grpc.port:9092}") int port) {
-    return ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+      @Value("${order.grpc.port:9090}") int port) {
+    // Use dns:/// target URI so the channel re-resolves hostname on reconnect
+    // (forAddress caches the IP at construction time — breaks on container restart)
+    return ManagedChannelBuilder.forTarget("dns:///" + host + ":" + port).usePlaintext().build();
   }
 
   @Bean
@@ -62,7 +64,7 @@ public class RiskRuntimeConfiguration {
   RiskGrpcServerLifecycle riskGrpcServerLifecycle(
       RiskDecisionGrpcService grpcService,
       GrpcCorrelationServerInterceptor correlationInterceptor,
-      @Value("${grpc.server.port:9091}") int grpcPort) {
+      @Value("${grpc.server.port:9090}") int grpcPort) {
     return new RiskGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }

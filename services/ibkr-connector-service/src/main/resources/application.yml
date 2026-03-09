@@ -22,6 +22,8 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      concurrency: 3          # one thread per partition — matches 3-partition topics
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -30,7 +32,7 @@ spring:
 
 grpc:
   server:
-    port: ${GRPC_SERVER_PORT:9093}
+    port: ${GRPC_SERVER_PORT:9090}
 
 management:
   endpoint:

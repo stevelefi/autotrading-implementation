@@ -1,0 +1,17 @@
+# Local-dev build: JAR is pre-built by Maven on the host (uses ~/.m2 cache).
+# This stage only copies the result — no Maven inside Docker.
+# OTel layer is cached after the first build; subsequent builds finish in ~1s.
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+ARG OTEL_JAVAAGENT_VERSION=2.13.1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && mkdir -p /otel \
+    && curl -fsSL -o /otel/opentelemetry-javaagent.jar \
+       https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_JAVAAGENT_VERSION}/opentelemetry-javaagent.jar \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY target/event-processor-service-0.1.0-SNAPSHOT.jar /app/app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
