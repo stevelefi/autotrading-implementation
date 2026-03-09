@@ -5,15 +5,16 @@ check.py — Pre-commit gate: runs all required local checks and reports results
 Checks run (in order):
     1. branch-check   Current branch follows GitHub flow naming convention
     2. spec-verify    Verify pinned spec baseline (tools/spec_sync.py verify)
-    3. unit           Unit tests — zero failures tolerated
-    4. coverage       JaCoCo coverage gate on core modules (≥50% line)
-    5. e2e            E2E tests — all five test classes in tests/e2e/
-    6. helm-lint      helm lint infra/helm/charts/trading-service
-    7. helm-template  helm template (dry-run render)
+    3. agent-sync     Verify CLAUDE.md is a symlink to AGENTS.md (not a manual copy)
+    4. unit           Unit tests — zero failures tolerated
+    5. coverage       JaCoCo coverage gate on core modules (≥50% line)
+    6. e2e            E2E tests — all five test classes in tests/e2e/
+    7. helm-lint      helm lint infra/helm/charts/trading-service
+    8. helm-template  helm template (dry-run render)
 
 Usage:
-    python3 scripts/check.py              # full gate — all seven checks
-    python3 scripts/check.py --fast       # skip e2e (checks 1-4,6,7)
+    python3 scripts/check.py              # full gate — all eight checks
+    python3 scripts/check.py --fast       # skip e2e (checks 1-5,7,8)
     python3 scripts/check.py --skip-helm  # skip Helm checks (useful if helm not installed)
     python3 scripts/check.py --only unit coverage   # run specific checks by name
 
@@ -25,6 +26,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -70,12 +72,12 @@ def run(*args: str) -> int:
 
 
 def check_branch_check() -> int:
-    banner("Check 1/7: branch-check")
+    banner("Check 1/8: branch-check")
     return run(sys.executable, "scripts/branch_check.py")
 
 
 def check_spec_verify() -> int:
-    banner("Check 2/7: spec-verify")
+    banner("Check 2/8: spec-verify")
     return run(
         sys.executable, "tools/spec_sync.py", "verify",
         "--dest", "specs/vendor",
@@ -83,13 +85,35 @@ def check_spec_verify() -> int:
     )
 
 
+def check_agent_sync() -> int:
+    banner("Check 3/8: agent-sync (CLAUDE.md symlink integrity)")
+    claude = ROOT / "CLAUDE.md"
+    if not claude.is_symlink():
+        print(
+            "[check.py] FAIL: CLAUDE.md is a regular file, not a symlink.\n"
+            "          Run: rm CLAUDE.md && ln -s AGENTS.md CLAUDE.md",
+            flush=True,
+        )
+        return 1
+    target = os.readlink(claude)
+    if target != "AGENTS.md":
+        print(
+            f"[check.py] FAIL: CLAUDE.md symlink points to '{target}', expected 'AGENTS.md'.\n"
+            f"          Run: rm CLAUDE.md && ln -s AGENTS.md CLAUDE.md",
+            flush=True,
+        )
+        return 1
+    print("[check.py] CLAUDE.md -> AGENTS.md ✓", flush=True)
+    return 0
+
+
 def check_unit() -> int:
-    banner("Check 3/7: unit tests")
+    banner("Check 4/8: unit tests")
     return run("mvn", "-B", "-DskipITs=true", "test")
 
 
 def check_coverage() -> int:
-    banner("Check 4/7: JaCoCo coverage gate (≥50% line on core modules)")
+    banner("Check 5/8: JaCoCo coverage gate (≥50% line on core modules)")
     return run(
         "mvn", "-B", "-Pcoverage-core",
         "-pl", COVERAGE_CORE_MODULES,
@@ -98,12 +122,12 @@ def check_coverage() -> int:
 
 
 def check_e2e() -> int:
-    banner("Check 5/7: e2e tests")
+    banner("Check 6/8: e2e tests")
     return run("mvn", "-B", "-pl", "tests/e2e", "-am", "test")
 
 
 def check_helm_lint() -> int:
-    banner("Check 6/7: helm lint")
+    banner("Check 7/8: helm lint")
     if not shutil.which("helm"):
         print("[check.py] 'helm' not found on PATH — skipping helm-lint", flush=True)
         return 0
@@ -111,7 +135,7 @@ def check_helm_lint() -> int:
 
 
 def check_helm_template() -> int:
-    banner("Check 7/7: helm template (dry-run render)")
+    banner("Check 8/8: helm template (dry-run render)")
     if not shutil.which("helm"):
         print("[check.py] 'helm' not found on PATH — skipping helm-template", flush=True)
         return 0
@@ -126,6 +150,7 @@ def check_helm_template() -> int:
 ALL_CHECKS: list[tuple[str, Callable[[], int]]] = [
     ("branch-check",   check_branch_check),
     ("spec-verify",    check_spec_verify),
+    ("agent-sync",     check_agent_sync),
     ("unit",           check_unit),
     ("coverage",       check_coverage),
     ("e2e",            check_e2e),
@@ -177,7 +202,7 @@ def main() -> None:
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Skip e2e tests (runs checks: branch-check, spec-verify, unit, coverage, helm-lint, helm-template)",
+        help="Skip e2e tests (runs checks: branch-check, spec-verify, agent-sync, unit, coverage, helm-lint, helm-template)",
     )
     parser.add_argument(
         "--skip-helm",
