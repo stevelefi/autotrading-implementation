@@ -32,13 +32,17 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Publishes the {@code policy.evaluations.audit.v1} event directly to Kafka after
  * persisting to the DB. No outbox is used. Kafka publish failure is best-effort: the
  * audit event is logged as a warning but does not fail the gRPC response.
+ *
+ * <p>The downstream {@code CreateOrderIntent} call to order-service is fire-and-forget
+ * (FutureStub whose result is discarded). Risk does not need the order response to
+ * complete its own evaluation — blocking on it added ~750ms of unnecessary latency.
  */
 public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisionServiceImplBase {
 
   private static final Logger log = LoggerFactory.getLogger(RiskDecisionGrpcService.class);
   private static final String AUDIT_TOPIC = "policy.evaluations.audit.v1";
 
-  private final OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub;
+  private final OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderStub;
   private final SimplePolicyEngine policyEngine;
   private final RiskDecisionRepository riskDecisionRepository;
   private final PolicyDecisionLogRepository policyDecisionLogRepository;
@@ -47,7 +51,7 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
   private final List<PolicyAuditEvent> auditEvents = new CopyOnWriteArrayList<>();
 
   public RiskDecisionGrpcService(
-      OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub,
+      OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderStub,
       SimplePolicyEngine policyEngine,
       RiskDecisionRepository riskDecisionRepository,
       PolicyDecisionLogRepository policyDecisionLogRepository,
@@ -96,7 +100,10 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
           .setTimeInForce(request.getTimeInForce())
           .build();
 
-      orderStub.createOrderIntent(command);
+      // Fire order creation without blocking — risk does not need the order response.
+      // FutureStub returns immediately; the result is intentionally discarded.
+      @SuppressWarnings("unused")
+      var ignored = orderStub.createOrderIntent(command);
 
       long latencyMs = Duration.between(started, Instant.now()).toMillis();
       Instant now = Instant.now();

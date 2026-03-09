@@ -80,7 +80,7 @@ class VerticalSliceGrpcFlowTest {
         .build().start();
     orderChannel = InProcessChannelBuilder.forName(orderName).directExecutor().build();
 
-    OrderCommandServiceGrpc.OrderCommandServiceBlockingStub orderStub = OrderCommandServiceGrpc.newBlockingStub(orderChannel);
+    OrderCommandServiceGrpc.OrderCommandServiceFutureStub orderStub = OrderCommandServiceGrpc.newFutureStub(orderChannel);
     RiskDecisionGrpcService riskImpl = new RiskDecisionGrpcService(orderStub, new SimplePolicyEngine(),
         mock(RiskDecisionRepository.class), mock(PolicyDecisionLogRepository.class),
         mock(DirectKafkaPublisher.class), new ObjectMapper());
