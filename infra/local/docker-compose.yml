@@ -133,6 +133,15 @@ services:
       loki:
         condition: service_started
 
+  tempo:
+    image: grafana/tempo:2.7.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ../observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${TEMPO_PORT}:3200"
+
   grafana:
     image: grafana/grafana:11.4.0
     environment:
@@ -150,6 +159,8 @@ services:
       prometheus:
         condition: service_started
       loki:
+        condition: service_started
+      tempo:
         condition: service_started
 
   ibkr-simulator:
@@ -450,3 +461,4 @@ volumes:
   grafana-data:
   prometheus-data:
   loki-data:
+  tempo-data:
