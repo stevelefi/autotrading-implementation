@@ -29,6 +29,8 @@ import com.autotrading.services.ingress.api.IngressAcceptedResponse;
 import com.autotrading.services.ingress.api.IngressSubmitRequest;
 import com.autotrading.services.ingress.db.IngressRawEventEntity;
 import com.autotrading.services.ingress.db.IngressRawEventRepository;
+import io.micrometer.tracing.Tracer;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -43,16 +45,19 @@ public class IngressService {
   private final KafkaFirstPublisher kafkaFirstPublisher;
   private final IngressRawEventRepository rawEventRepository;
   private final ObjectMapper objectMapper;
+  private final Tracer tracer;
 
   public IngressService(
       IdempotencyService idempotencyService,
       KafkaFirstPublisher kafkaFirstPublisher,
       IngressRawEventRepository rawEventRepository,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      Tracer tracer) {
     this.idempotencyService = idempotencyService;
     this.kafkaFirstPublisher = kafkaFirstPublisher;
     this.rawEventRepository = rawEventRepository;
     this.objectMapper = objectMapper;
+    this.tracer = tracer;
   }
 
   /**
@@ -88,7 +93,9 @@ public class IngressService {
     // New event — persist raw for audit, then publish to Kafka post-commit
     String rawEventId = "raw-" + UUID.randomUUID();
     String ingressEventId = "ing-" + UUID.randomUUID();
-    String traceId = "trc-" + UUID.randomUUID();
+    // Use the active OTel trace ID so the same ID appears in Tempo spans, Loki logs,
+    // DB records, and Kafka event envelopes — enabling single-ID cross-layer correlation.
+    String traceId = resolveTraceId();
     Instant now = Instant.now();
 
     String payloadJson = serialize(request);
@@ -196,6 +203,20 @@ public class IngressService {
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("failed to serialize object", e);
     }
+  }
+
+  /**
+   * Returns the active OTel trace ID from the current span so it can be stored in
+   * the DB and propagated through Kafka envelopes. Falls back to a random UUID when
+   * there is no active span (e.g. unit tests running without the OTel agent).
+   */
+  private String resolveTraceId() {
+    io.micrometer.tracing.Span current = tracer.currentSpan();
+    if (current != null) {
+      String id = current.context().traceId();
+      if (id != null && !id.isBlank()) return id;
+    }
+    return UUID.randomUUID().toString();
   }
 
   private boolean blank(String s) {
