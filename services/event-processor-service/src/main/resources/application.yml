@@ -22,8 +22,10 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      fetch-max-wait: 100ms   # reduce poll gap from default 500ms → 100ms
+      fetch-max-wait: 5ms    # reduce poll gap from default 500ms → 5ms
       fetch-min-size: 1       # deliver immediately when any byte is available
+    listener:
+      concurrency: 3          # one thread per partition — matches 3-partition topics
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer

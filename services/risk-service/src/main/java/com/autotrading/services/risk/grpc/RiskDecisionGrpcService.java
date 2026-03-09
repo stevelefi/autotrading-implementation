@@ -1,10 +1,22 @@
 package com.autotrading.services.risk.grpc;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.autotrading.command.v1.CreateOrderIntentRequest;
 import com.autotrading.command.v1.EvaluateSignalRequest;
 import com.autotrading.command.v1.EvaluateSignalResponse;
 import com.autotrading.command.v1.OrderCommandServiceGrpc;
 import com.autotrading.command.v1.RiskDecisionServiceGrpc;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.services.risk.core.PolicyAuditEvent;
 import com.autotrading.services.risk.core.PolicyEvaluationResult;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
@@ -13,18 +25,10 @@ import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionEntity;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import com.autotrading.libs.kafka.DirectKafkaPublisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * gRPC service for risk policy evaluation.
@@ -102,8 +106,16 @@ public class RiskDecisionGrpcService extends RiskDecisionServiceGrpc.RiskDecisio
 
       // Fire order creation without blocking — risk does not need the order response.
       // FutureStub returns immediately; the result is intentionally discarded.
-      @SuppressWarnings("unused")
-      var ignored = orderStub.createOrderIntent(command);
+      // IMPORTANT: fork the gRPC context so that when responseObserver.onCompleted()
+      // cancels the parent context, the in-flight child call is NOT propagated-cancelled.
+      Context forkCtx = Context.current().fork();
+      Context prevCtx = forkCtx.attach();
+      try {
+        @SuppressWarnings("unused")
+        var ignored = orderStub.createOrderIntent(command);
+      } finally {
+        forkCtx.detach(prevCtx);
+      }
 
       long latencyMs = Duration.between(started, Instant.now()).toMillis();
       Instant now = Instant.now();

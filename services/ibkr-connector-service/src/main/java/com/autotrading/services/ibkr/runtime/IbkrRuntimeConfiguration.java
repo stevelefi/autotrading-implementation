@@ -46,7 +46,7 @@ public class IbkrRuntimeConfiguration {
   IbkrGrpcServerLifecycle ibkrGrpcServerLifecycle(
       BrokerCommandGrpcService grpcService,
       GrpcCorrelationServerInterceptor correlationInterceptor,
-      @Value("${grpc.server.port:9093}") int grpcPort) {
+      @Value("${grpc.server.port:9090}") int grpcPort) {
     return new IbkrGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }

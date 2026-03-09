@@ -1,0 +1,71 @@
+# docker-compose.local.yml
+#
+# Local-dev build override: swaps every app service to use Dockerfile.local
+# (no Maven inside Docker — JAR is pre-built on the host).
+# Build context is the individual service directory, so Docker only sends
+# ~10 MB instead of the entire repo root.
+#
+# Also applies one local-dev startup optimisation:
+#
+#   Healthcheck interval: 10s → 3s + start_period: 10s
+#   Docker polls readiness every 3s instead of 10s, so a service that
+#   finishes booting at t=8s is declared Healthy at t=9s instead of t=20s.
+#
+# This override is NOT applied by CI or production (those use Dockerfile).
+
+# Shared healthcheck for all Spring Boot app services (YAML anchor).
+x-app-healthcheck: &app-healthcheck
+  test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
+  interval: 3s      # was 10s — poll every 3s so a fast boot is detected quickly
+  timeout: 3s
+  start_period: 10s # failed checks in first 10s don't count against retries
+  retries: 20
+
+services:
+  ingress-gateway-service:
+    build:
+      context: ../../services/ingress-gateway-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  event-processor-service:
+    build:
+      context: ../../services/event-processor-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  agent-runtime-service:
+    build:
+      context: ../../services/agent-runtime-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  risk-service:
+    build:
+      context: ../../services/risk-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  order-service:
+    build:
+      context: ../../services/order-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  ibkr-connector-service:
+    build:
+      context: ../../services/ibkr-connector-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  performance-service:
+    build:
+      context: ../../services/performance-service
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck
+
+  monitoring-api:
+    build:
+      context: ../../services/monitoring-api
+      dockerfile: Dockerfile.local
+    healthcheck: *app-healthcheck

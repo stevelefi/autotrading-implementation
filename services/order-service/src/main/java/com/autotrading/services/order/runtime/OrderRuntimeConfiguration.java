@@ -38,8 +38,10 @@ public class OrderRuntimeConfiguration {
   @Bean(destroyMethod = "shutdownNow")
   ManagedChannel brokerGrpcChannel(
       @Value("${broker.grpc.host:ibkr-connector-service}") String host,
-      @Value("${broker.grpc.port:9093}") int port) {
-    return ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
+      @Value("${broker.grpc.port:9090}") int port) {
+    // Use dns:/// target URI so the channel re-resolves hostname on reconnect
+    // (forAddress caches the IP at construction time — breaks on container restart)
+    return ManagedChannelBuilder.forTarget("dns:///" + host + ":" + port).usePlaintext().build();
   }
 
   @Bean
@@ -76,7 +78,7 @@ public class OrderRuntimeConfiguration {
   OrderGrpcServerLifecycle orderGrpcServerLifecycle(
       OrderCommandGrpcService grpcService,
       GrpcCorrelationServerInterceptor correlationInterceptor,
-      @Value("${grpc.server.port:9092}") int grpcPort) {
+      @Value("${grpc.server.port:9090}") int grpcPort) {
     return new OrderGrpcServerLifecycle(grpcService, correlationInterceptor, grpcPort);
   }
 }
