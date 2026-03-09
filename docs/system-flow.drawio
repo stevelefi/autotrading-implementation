@@ -1,0 +1,251 @@
+<mxGraphModel dx="1800" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1200" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BACKGROUND SWIM LANES
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Ingress lane background -->
+    <mxCell id="bg_ingress" value="Ingress Path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f7ff;strokeColor=#b0ccee;fontSize=13;fontStyle=1;fontColor=#336699;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="60" y="100" width="540" height="560" as="geometry" />
+    </mxCell>
+
+    <!-- gRPC chain lane background -->
+    <mxCell id="bg_grpc" value="gRPC Command Chain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8f0;strokeColor=#e6b87a;fontSize=13;fontStyle=1;fontColor=#a05000;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="640" y="100" width="1190" height="380" as="geometry" />
+    </mxCell>
+
+    <!-- Analytics lane background -->
+    <mxCell id="bg_analytics" value="Analytics &amp; Monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fff4;strokeColor=#82b366;fontSize=13;fontStyle=1;fontColor=#2d6a3f;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="640" y="530" width="1190" height="610" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         HTTP CLIENT
+    ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="client" value="&lt;b&gt;HTTP Client&lt;/b&gt;&#xa;POST /v1/ingest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#555555;fontColor=#333333;fontStyle=0;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="230" y="30" width="200" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         INGRESS LANE — SERVICES
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ingress-gateway-service -->
+    <mxCell id="svc_ingress" value="&lt;b&gt;ingress-gateway-service&lt;/b&gt;&#xa;HTTP :8080 | gRPC :9090&#xa;────────────────────────&#xa;📋 ingress_events&#xa;📋 idempotency_keys&#xa;📋 outbox_events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="100" y="155" width="300" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: ingress.events.normalized.v1 -->
+    <mxCell id="kaf_ingress_norm" value="⚡ ingress.events.normalized.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="135" y="305" width="290" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- event-processor-service -->
+    <mxCell id="svc_eventproc" value="&lt;b&gt;event-processor-service&lt;/b&gt;&#xa;Kafka consumer&#xa;────────────────────────&#xa;📋 routed_events&#xa;📋 outbox_events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="100" y="405" width="300" height="90" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: trade.events.routed.v1 -->
+    <mxCell id="kaf_trade_routed" value="⚡ trade.events.routed.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="135" y="545" width="290" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- agent-runtime-service -->
+    <mxCell id="svc_agent" value="&lt;b&gt;agent-runtime-service&lt;/b&gt;&#xa;Kafka consumer | gRPC :9091&#xa;────────────────────────&#xa;📋 agents&#xa;📋 signals&#xa;📋 inbox_events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="100" y="645" width="300" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         gRPC CHAIN — SERVICES
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- risk-service -->
+    <mxCell id="svc_risk" value="&lt;b&gt;risk-service&lt;/b&gt;&#xa;gRPC :9092&#xa;EvaluateSignal RPC&#xa;────────────────────────&#xa;📋 risk_decisions&#xa;📋 policy_rules&#xa;📋 outbox_events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="680" y="160" width="280" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- order-service -->
+    <mxCell id="svc_order" value="&lt;b&gt;order-service&lt;/b&gt;&#xa;gRPC :9093&#xa;CreateOrder RPC&#xa;────────────────────────&#xa;📋 order_intents&#xa;📋 trade_orders&#xa;📋 outbox_events&#xa;📋 inbox_events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1050" y="150" width="280" height="120" as="geometry" />
+    </mxCell>
+
+    <!-- ibkr-connector-service -->
+    <mxCell id="svc_ibkr" value="&lt;b&gt;ibkr-connector-service&lt;/b&gt;&#xa;gRPC :9094&#xa;SubmitOrder RPC&#xa;────────────────────────&#xa;📋 broker_orders&#xa;📋 executions&#xa;📋 outbox_events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1430" y="155" width="280" height="110" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ANALYTICS LANE — SERVICES + KAFKA TOPICS
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Kafka: risk.decisions.v1 -->
+    <mxCell id="kaf_risk_dec" value="⚡ risk.decisions.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="680" y="555" width="240" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: policy.evaluations.audit.v1 -->
+    <mxCell id="kaf_policy_audit" value="⚡ policy.evaluations.audit.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="680" y="625" width="280" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: orders.status.v1 -->
+    <mxCell id="kaf_orders_status" value="⚡ orders.status.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1050" y="555" width="240" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: system.alerts.v1 -->
+    <mxCell id="kaf_sys_alerts" value="⚡ system.alerts.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1050" y="625" width="220" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- monitoring-api -->
+    <mxCell id="svc_monitoring" value="&lt;b&gt;monitoring-api&lt;/b&gt;&#xa;HTTP :8085 | gRPC :9095&#xa;────────────────────────&#xa;📋 system_alerts&#xa;📋 trading_mode&#xa;📋 kill_switch_log" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1030" y="720" width="280" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: fills.executed.v1 -->
+    <mxCell id="kaf_fills" value="⚡ fills.executed.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1440" y="555" width="220" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- performance-service -->
+    <mxCell id="svc_perf" value="&lt;b&gt;performance-service&lt;/b&gt;&#xa;Kafka consumer | HTTP :8086&#xa;────────────────────────&#xa;📋 portfolio_snapshots&#xa;📋 position_records&#xa;📋 pnl_records" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="1420" y="660" width="300" height="100" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: positions.updated.v1 -->
+    <mxCell id="kaf_positions" value="⚡ positions.updated.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1420" y="810" width="240" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: pnl.snapshots.v1 -->
+    <mxCell id="kaf_pnl" value="⚡ pnl.snapshots.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1420" y="880" width="220" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- Kafka: ingress.errors.v1 -->
+    <mxCell id="kaf_errors" value="⚡ ingress.errors.v1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="460" y="165" width="210" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         LEGEND
+    ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&#xa;🔵 Blue service = Ingress path&#xa;🟠 Orange service = gRPC chain&#xa;🟢 Green service = Analytics&#xa;⚡ Yellow cylinder = Kafka topic (3 partitions)&#xa;🔴 Red cylinder = Alert topic&#xa;──▶ HTTP / gRPC call&#xa;- -▶ Kafka publish/subscribe" style="text;html=1;strokeColor=#cccccc;fillColor=#ffffff;align=left;verticalAlign=middle;spacingLeft=8;rounded=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="60" y="820" width="300" height="130" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EDGES — INGRESS PATH (solid arrows, gray)
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Client → ingress-gateway -->
+    <mxCell id="e_client_ingress" value="HTTP POST" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#444444;fontColor=#444444;fontSize=9;" edge="1" source="client" target="svc_ingress" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ingress-gateway → ingress.events.normalized.v1 (publish) -->
+    <mxCell id="e_ingress_kaf1" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_ingress" target="kaf_ingress_norm" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ingress-gateway → ingress.errors.v1 (error path publish) -->
+    <mxCell id="e_ingress_errors" value="on error" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="svc_ingress" target="kaf_errors" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ingress.events.normalized.v1 → event-processor (consume) -->
+    <mxCell id="e_kaf1_eventproc" value="consume" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="kaf_ingress_norm" target="svc_eventproc" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- event-processor → trade.events.routed.v1 (publish) -->
+    <mxCell id="e_eventproc_kaf2" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_eventproc" target="kaf_trade_routed" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- trade.events.routed.v1 → agent-runtime (consume) -->
+    <mxCell id="e_kaf2_agent" value="consume" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="kaf_trade_routed" target="svc_agent" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EDGES — gRPC CHAIN (solid thick arrows, orange)
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- agent-runtime → risk (EvaluateSignal gRPC) -->
+    <mxCell id="e_agent_risk" value="EvaluateSignal&#xa;gRPC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#d79b00;fontColor=#a05000;strokeWidth=2;fontSize=10;fontStyle=1;" edge="1" source="svc_agent" target="svc_risk" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- risk → order (CreateOrder gRPC) -->
+    <mxCell id="e_risk_order" value="CreateOrder&#xa;gRPC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#d79b00;fontColor=#a05000;strokeWidth=2;fontSize=10;fontStyle=1;" edge="1" source="svc_risk" target="svc_order" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- order → ibkr (SubmitOrder gRPC) -->
+    <mxCell id="e_order_ibkr" value="SubmitOrder&#xa;gRPC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#d79b00;fontColor=#a05000;strokeWidth=2;fontSize=10;fontStyle=1;" edge="1" source="svc_order" target="svc_ibkr" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         EDGES — ANALYTICS KAFKA STREAMS (dashed, gold)
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- risk → risk.decisions.v1 (publish) -->
+    <mxCell id="e_risk_decpub" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_risk" target="kaf_risk_dec" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- risk → policy.evaluations.audit.v1 (publish) -->
+    <mxCell id="e_risk_auditpub" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_risk" target="kaf_policy_audit" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- order → orders.status.v1 (publish) -->
+    <mxCell id="e_order_statuspub" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_order" target="kaf_orders_status" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- order → system.alerts.v1 (publish, FROZEN alerts) -->
+    <mxCell id="e_order_alertspub" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="svc_order" target="kaf_sys_alerts" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- system.alerts.v1 → monitoring-api (consume) -->
+    <mxCell id="e_alerts_monitoring" value="consume" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#b85450;fontColor=#b85450;dashed=1;fontSize=9;" edge="1" source="kaf_sys_alerts" target="svc_monitoring" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ibkr → fills.executed.v1 (publish) -->
+    <mxCell id="e_ibkr_fillspub" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_ibkr" target="kaf_fills" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- fills.executed.v1 → performance-service (consume) -->
+    <mxCell id="e_fills_perf" value="consume" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="kaf_fills" target="svc_perf" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- performance → positions.updated.v1 (publish) -->
+    <mxCell id="e_perf_pos" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_perf" target="kaf_positions" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- performance → pnl.snapshots.v1 (publish) -->
+    <mxCell id="e_perf_pnl" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;fontColor=#d6b656;dashed=1;fontSize=9;" edge="1" source="svc_perf" target="kaf_pnl" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TITLE
+    ═══════════════════════════════════════════════════════════════════ -->
+    <mxCell id="title" value="Autotrading System — Service Flow, Kafka Topics &amp; Database Tables" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+      <mxGeometry x="300" y="960" width="1100" height="40" as="geometry" />
+    </mxCell>
+
+  </root>
+</mxGraphModel>

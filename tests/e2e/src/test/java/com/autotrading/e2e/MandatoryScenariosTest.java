@@ -1,27 +1,35 @@
 package com.autotrading.e2e;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
-import com.autotrading.command.v1.CancelOrderRequest;
-import com.autotrading.command.v1.CreateOrderIntentRequest;
-import com.autotrading.command.v1.CreateOrderIntentResponse;
 import com.autotrading.command.v1.EvaluateSignalRequest;
 import com.autotrading.command.v1.EvaluateSignalResponse;
 import com.autotrading.command.v1.OrderCommandServiceGrpc;
 import com.autotrading.command.v1.RequestContext;
 import com.autotrading.command.v1.RiskDecisionServiceGrpc;
-import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.reliability.inbox.ConsumerDeduper;
 import com.autotrading.libs.reliability.inbox.InMemoryConsumerInboxRepository;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.libs.reliability.outbox.InMemoryOutboxRepository;
 import com.autotrading.libs.reliability.outbox.OutboxDispatcher;
 import com.autotrading.libs.reliability.outbox.OutboxEvent;
-import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.reliability.outbox.OutboxStatus;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
@@ -36,22 +44,12 @@ import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
 import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
 
 /**
  * Mandatory scenarios from TESTING_AND_RELEASE_GATES.md:
@@ -93,11 +91,19 @@ class MandatoryScenariosTest {
   // ────────────────────────────────────────────────────────────────────────
 
   private BrokerConnectorEngine newBrokerEngine(DirectKafkaPublisher publisher) {
+    BrokerOrderRepository mockRepo = mock(BrokerOrderRepository.class);
+    lenient().when(mockRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    com.autotrading.services.ibkr.client.IbkrHealthProbe mockProbe =
+        mock(com.autotrading.services.ibkr.client.IbkrHealthProbe.class);
+    lenient().when(mockProbe.isUp()).thenReturn(true);
     return new BrokerConnectorEngine(
         new InMemoryIdempotencyService(),
-        mock(BrokerOrderRepository.class),
+        mockRepo,
         mock(ExecutionRepository.class),
-        publisher, new ObjectMapper());
+        publisher, new ObjectMapper(),
+        mockProbe,
+        mock(com.autotrading.services.ibkr.client.IbkrRestClient.class),
+        true /* simulatorMode */);
   }
 
   private OrderSafetyEngine newOrderEngine(Clock clock) {

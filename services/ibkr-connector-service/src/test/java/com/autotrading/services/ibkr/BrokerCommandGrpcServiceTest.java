@@ -17,18 +17,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.kafka.DirectKafkaPublisher;
+import com.autotrading.services.ibkr.client.IbkrHealthProbe;
+import com.autotrading.services.ibkr.client.IbkrRestClient;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class BrokerCommandGrpcServiceTest {
 
-    private final BrokerConnectorEngine engine = new BrokerConnectorEngine(
-            new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
-            mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper());
+    private static BrokerConnectorEngine buildEngine() {
+        BrokerOrderRepository mockRepo = mock(BrokerOrderRepository.class);
+        lenient().when(mockRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+        IbkrHealthProbe mockProbe = mock(IbkrHealthProbe.class);
+        lenient().when(mockProbe.isUp()).thenReturn(true);
+        return new BrokerConnectorEngine(
+                new InMemoryIdempotencyService(), mockRepo,
+                mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper(),
+                mockProbe, mock(IbkrRestClient.class), true);
+    }
+
+    private final BrokerConnectorEngine engine = buildEngine();
     private final BrokerCommandGrpcService service = new BrokerCommandGrpcService(engine);
 
     private static RequestContext ctx(String idem) {

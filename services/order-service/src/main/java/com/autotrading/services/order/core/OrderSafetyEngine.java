@@ -74,6 +74,14 @@ public class OrderSafetyEngine {
           .build();
     }
 
+    if (tradingMode == TradingMode.CIRCUIT_OPEN) {
+      return CreateOrderIntentResponse.newBuilder()
+          .setTraceId(request.getRequestContext().getTraceId())
+          .setStatus(CommandStatus.COMMAND_STATUS_REJECTED)
+          .addReasons("trading mode circuit-open: broker unavailable")
+          .build();
+    }
+
     // Namespace the key so order-service does not collide with risk-service
     // (or any other upstream service) that also claims the same idempotency key
     // against the shared idempotency_records table.
@@ -115,6 +123,25 @@ public class OrderSafetyEngine {
         .build();
 
     var submitResponse = brokerStub.submitOrder(submit);
+
+    // --- Circuit breaker handling ---
+    if (submitResponse.getStatus() == CommandStatus.COMMAND_STATUS_FAILED) {
+      tradingMode = TradingMode.CIRCUIT_OPEN;
+      alertEvents.add("system.alerts.v1:CRITICAL:broker_unavailable:" + orderIntentId);
+      metrics.incrementFirstStatusTimeoutCount();
+      log.warn("order-service circuit OPEN — broker returned FAILED orderIntentId={}", orderIntentId);
+      return CreateOrderIntentResponse.newBuilder()
+          .setTraceId(request.getRequestContext().getTraceId())
+          .setStatus(CommandStatus.COMMAND_STATUS_FAILED)
+          .addReasons("broker unavailable")
+          .build();
+    }
+
+    // Successful submit — auto-clear CIRCUIT_OPEN if it was set
+    if (tradingMode == TradingMode.CIRCUIT_OPEN) {
+      log.info("order-service circuit CLOSED — broker submission succeeded, clearing CIRCUIT_OPEN");
+      tradingMode = TradingMode.NORMAL;
+    }
 
     OrderIntentState state = new OrderIntentState(
         orderIntentId,

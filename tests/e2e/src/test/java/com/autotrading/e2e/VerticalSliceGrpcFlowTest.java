@@ -1,39 +1,43 @@
 package com.autotrading.e2e;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
-import com.autotrading.libs.kafka.DirectKafkaPublisher;
-import com.autotrading.services.ibkr.db.BrokerOrderRepository;
-import com.autotrading.services.ibkr.db.ExecutionRepository;
-import com.autotrading.services.order.db.OrderIntentRepository;
-import com.autotrading.services.order.db.OrderLedgerRepository;
-import com.autotrading.services.order.db.OrderStateHistoryRepository;
-import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
-import com.autotrading.services.risk.db.RiskDecisionRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.command.v1.EvaluateSignalRequest;
 import com.autotrading.command.v1.OrderCommandServiceGrpc;
 import com.autotrading.command.v1.RequestContext;
 import com.autotrading.command.v1.RiskDecisionServiceGrpc;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
+import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
+import com.autotrading.services.ibkr.db.BrokerOrderRepository;
+import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.autotrading.services.ibkr.grpc.BrokerCommandGrpcService;
 import com.autotrading.services.order.core.OrderSafetyEngine;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
 import com.autotrading.services.order.grpc.OrderCommandGrpcService;
 import com.autotrading.services.risk.core.SimplePolicyEngine;
+import com.autotrading.services.risk.db.PolicyDecisionLogRepository;
+import com.autotrading.services.risk.db.RiskDecisionRepository;
 import com.autotrading.services.risk.grpc.RiskDecisionGrpcService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
 
 class VerticalSliceGrpcFlowTest {
   private Server brokerServer;
@@ -55,9 +59,15 @@ class VerticalSliceGrpcFlowTest {
 
   @Test
   void riskToOrderToBrokerFlowRunsAndDedupesRetries() throws Exception {
+    BrokerOrderRepository mockBrokerRepo = mock(BrokerOrderRepository.class);
+    lenient().when(mockBrokerRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    com.autotrading.services.ibkr.client.IbkrHealthProbe mockProbe =
+        mock(com.autotrading.services.ibkr.client.IbkrHealthProbe.class);
+    lenient().when(mockProbe.isUp()).thenReturn(true);
     BrokerConnectorEngine brokerEngine = new BrokerConnectorEngine(
-        new InMemoryIdempotencyService(), mock(BrokerOrderRepository.class),
-        mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper());
+        new InMemoryIdempotencyService(), mockBrokerRepo,
+        mock(ExecutionRepository.class), mock(DirectKafkaPublisher.class), new ObjectMapper(),
+        mockProbe, mock(com.autotrading.services.ibkr.client.IbkrRestClient.class), true);
     String brokerName = InProcessServerBuilder.generateName();
     brokerServer = InProcessServerBuilder.forName(brokerName).directExecutor()
         .addService(new BrokerCommandGrpcService(brokerEngine))

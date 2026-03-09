@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/v1/api/iserver/account/orders"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "orders": [],
+      "snapshot": true
+    }
+  }
+}

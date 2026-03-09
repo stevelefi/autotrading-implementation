@@ -1,40 +1,48 @@
 package com.autotrading.services.ibkr;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import com.autotrading.command.v1.RequestContext;
 import com.autotrading.command.v1.CancelOrderRequest;
-import com.autotrading.command.v1.ReplaceOrderRequest;
-import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.command.v1.CommandStatus;
+import com.autotrading.command.v1.ReplaceOrderRequest;
+import com.autotrading.command.v1.RequestContext;
+import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.kafka.DirectKafkaPublisher;
+import com.autotrading.services.ibkr.client.IbkrHealthProbe;
+import com.autotrading.services.ibkr.client.IbkrRestClient;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
-import com.autotrading.services.ibkr.db.BrokerOrderEntity;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 class BrokerConnectorEngineTest {
 
   private BrokerConnectorEngine engine;
+  private IbkrHealthProbe mockHealthProbe;
 
   @BeforeEach
   void setUp() {
     BrokerOrderRepository mockRepo = mock(BrokerOrderRepository.class);
     lenient().when(mockRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
     DirectKafkaPublisher mockPublisher = mock(DirectKafkaPublisher.class);
+    mockHealthProbe = mock(IbkrHealthProbe.class);
+    lenient().when(mockHealthProbe.isUp()).thenReturn(true);
     engine = new BrokerConnectorEngine(
         new InMemoryIdempotencyService(),
         mockRepo,
         mock(ExecutionRepository.class),
         mockPublisher,
-        new ObjectMapper());
+        new ObjectMapper(),
+        mockHealthProbe,
+        mock(IbkrRestClient.class),
+        true /* simulatorMode */);
   }
 
   @Test
@@ -130,5 +138,43 @@ class BrokerConnectorEngineTest {
         .setIdempotencyKey(idem)
         .setPrincipalId("svc-order")
         .build();
+  }
+
+  /** Builds an engine in REST mode (simulatorMode=false) with a mockable health probe. */
+  private BrokerConnectorEngine buildRestModeEngine(IbkrHealthProbe probe, IbkrRestClient client) {
+    BrokerOrderRepository mockRepo = mock(BrokerOrderRepository.class);
+    lenient().when(mockRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    return new BrokerConnectorEngine(
+        new InMemoryIdempotencyService(),
+        mockRepo,
+        mock(ExecutionRepository.class),
+        mock(DirectKafkaPublisher.class),
+        new ObjectMapper(),
+        probe,
+        client,
+        false /* simulatorMode */);
+  }
+
+  @Test
+  void restMode_brokerUnavailable_returnsFailedStatus() {
+    IbkrHealthProbe downProbe = mock(IbkrHealthProbe.class);
+    when(downProbe.isUp()).thenReturn(false);
+
+    BrokerConnectorEngine restEngine = buildRestModeEngine(downProbe, mock(IbkrRestClient.class));
+
+    var response = restEngine.submit(baseSubmitRequest("idem-down", "ord-down", 5));
+
+    assertThat(response.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_FAILED);
+    assertThat(response.getBrokerSubmitId()).isEmpty();
+  }
+
+  @Test
+  void simulatorMode_probeDown_stillAccepts() {
+    // In simulator mode the health probe check is bypassed
+    when(mockHealthProbe.isUp()).thenReturn(false);
+
+    var response = engine.submit(baseSubmitRequest("idem-sim-down", "ord-sim-down", 5));
+
+    assertThat(response.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_ACCEPTED);
   }
 }

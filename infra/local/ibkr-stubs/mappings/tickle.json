@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/v1/api/tickle"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "iserver": {
+        "authStatus": {
+          "authenticated": true,
+          "connected": true,
+          "competing": false,
+          "message": ""
+        }
+      },
+      "session": "mock-session-id"
+    }
+  }
+}

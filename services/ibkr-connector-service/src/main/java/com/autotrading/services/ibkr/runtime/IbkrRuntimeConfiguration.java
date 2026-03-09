@@ -10,6 +10,9 @@ import com.autotrading.libs.idempotency.IdempotencyService;
 import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
+import com.autotrading.services.ibkr.client.IbkrHealthProbe;
+import com.autotrading.services.ibkr.client.IbkrOrderPoller;
+import com.autotrading.services.ibkr.client.IbkrRestClient;
 import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
@@ -22,9 +25,35 @@ import io.micrometer.core.instrument.MeterRegistry;
 @EnableTransactionManagement
 public class IbkrRuntimeConfiguration {
 
+  @Value("${ibkr.mode:SIMULATOR}")
+  private String ibkrMode;
+
+  @Value("${ibkr.cp.base-url:http://localhost:8081}")
+  private String cpBaseUrl;
+
+  @Value("${ibkr.cp.account-id:DU123456}")
+  private String cpAccountId;
+
+  @Value("${ibkr.cp.tickle-interval-ms:30000}")
+  private long tickleIntervalMs;
+
+  @Value("${ibkr.cp.poll-interval-ms:5000}")
+  private long pollIntervalMs;
+
   @Bean
   ReliabilityMetrics reliabilityMetrics(MeterRegistry meterRegistry) {
     return new ReliabilityMetrics(meterRegistry);
+  }
+
+  @Bean
+  IbkrRestClient ibkrRestClient() {
+    return new IbkrRestClient(cpBaseUrl, cpAccountId);
+  }
+
+  @Bean
+  IbkrHealthProbe ibkrHealthProbe(IbkrRestClient ibkrRestClient) {
+    boolean simulatorMode = "SIMULATOR".equalsIgnoreCase(ibkrMode);
+    return new IbkrHealthProbe(ibkrRestClient, tickleIntervalMs, simulatorMode);
   }
 
   @Bean
@@ -33,8 +62,21 @@ public class IbkrRuntimeConfiguration {
       BrokerOrderRepository brokerOrderRepository,
       ExecutionRepository executionRepository,
       @Qualifier("bestEffortKafkaPublisher") DirectKafkaPublisher bestEffortPublisher,
-      ObjectMapper objectMapper) {
-    return new BrokerConnectorEngine(idempotencyService, brokerOrderRepository, executionRepository, bestEffortPublisher, objectMapper);
+      ObjectMapper objectMapper,
+      IbkrRestClient ibkrRestClient,
+      IbkrHealthProbe ibkrHealthProbe) {
+    boolean simulatorMode = "SIMULATOR".equalsIgnoreCase(ibkrMode);
+    return new BrokerConnectorEngine(
+        idempotencyService, brokerOrderRepository, executionRepository,
+        bestEffortPublisher, objectMapper,
+        ibkrHealthProbe, ibkrRestClient, simulatorMode);
+  }
+
+  @Bean
+  IbkrOrderPoller ibkrOrderPoller(IbkrRestClient ibkrRestClient,
+                                   BrokerConnectorEngine engine,
+                                   IbkrHealthProbe ibkrHealthProbe) {
+    return new IbkrOrderPoller(ibkrRestClient, engine, ibkrHealthProbe, pollIntervalMs);
   }
 
   @Bean
