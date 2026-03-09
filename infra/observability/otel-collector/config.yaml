@@ -21,12 +21,18 @@ exporters:
     tls:
       insecure: true
 
+  # Forward OTLP traces to Grafana Tempo for persistent span storage + waterfall UI
+  otlphttp/tempo:
+    endpoint: http://tempo:4318
+    tls:
+      insecure: true
+
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [debug, otlphttp/tempo]
 
     logs:
       receivers: [otlp]

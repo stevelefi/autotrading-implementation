@@ -20,3 +20,34 @@ datasources:
     editable: false
     jsonData:
       maxLines: 1000
+      # Extract trace_id from any log line and make it a clickable link to Tempo
+      derivedFields:
+        - name: trace_id
+          matcherRegex: 'trace_id=(\S+)'
+          url: '$${__value.raw}'
+          datasourceUid: tempo
+          urlDisplayLabel: View Trace
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: false
+    jsonData:
+      httpMethod: GET
+      serviceMap:
+        datasourceUid: prometheus
+      # Click a trace span → jump to the matching Loki logs
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: false
+      # Click a trace → see associated metrics in Prometheus
+      tracesToMetrics:
+        datasourceUid: prometheus
+        tags:
+          - key: service.name
+            value: service

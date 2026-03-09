@@ -165,10 +165,11 @@ Local UIs after `make up`:
 
 | Tool | URL | Purpose |
 |---|---|---|
-| Grafana | http://localhost:3000 | Reliability dashboard, Loki log search (Explore) |
+| Grafana | http://localhost:3000 | Reliability dashboard, Loki log search, Tempo trace viewer (Explore) |
 | Prometheus | http://localhost:9090 | Ad-hoc PromQL, alert status, scrape targets |
 | Redpanda Console | http://localhost:8888 | Kafka topic browser, consumer-group lag |
 | Loki API | http://localhost:3100 | Log aggregation backend |
+| Tempo | http://localhost:3200 | Distributed trace storage — service waterfall + latency by `trace_id` |
 | OTel Collector gRPC | localhost:4317 | Trace/log ingestion endpoint |
 | OTel Collector HTTP | localhost:4318 | Trace/log ingestion endpoint (HTTP/protobuf) |
 

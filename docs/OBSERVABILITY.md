@@ -16,7 +16,8 @@ After `make up`, all dashboards are available locally:
 | **Prometheus** | http://localhost:9090 | Ad-hoc PromQL, raw alert states, scrape targets |
 | **Redpanda Console** | http://localhost:8888 | Kafka topic browser, consumer-group lag, message inspector |
 | **Loki API** | http://localhost:3100 | Log aggregation backend (query via Grafana Explore or `trace.py`) |
-| **OTel Collector** | grpc:4317 / http:4318 | Receives traces+logs from all 8 services, forwards to Loki |
+| **Tempo** | http://localhost:3200 | Distributed trace storage — paste a `trace_id` to see service waterfall + latency |
+| **OTel Collector** | grpc:4317 / http:4318 | Receives traces+logs from all 8 services, forwards to Loki and Tempo |
 
 Grafana credentials: set via `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` in `infra/local/.env.compose.example` (copy to `.env.compose` before first run); defaults to `admin`/`admin`.
 
@@ -707,7 +708,8 @@ All 8 services (Spring Boot + OTel Java Agent)
     ├──► OTel OTLP/HTTP (port 4318) ──► OTel Collector
     │                                       │
     │                                       ├── traces → debug exporter (OTel Collector stdout)
-    │                                       └── logs   → Loki (http://loki:3100/otlp)
+    │                                       ├── traces → Tempo  (http://tempo:4318)  ← persistent span storage
+    │                                       └── logs   → Loki   (http://loki:3100/otlp)
     │
     └──► Docker stdout/stderr
               │
@@ -720,7 +722,7 @@ All 8 services (Spring Boot + OTel Java Agent)
 
 Both pipelines deliver to Loki; Promtail adds `service`, `container`, and `compose_project` labels from Docker metadata. OTel adds structured fields from the Java agent.
 
-For distributed **trace** storage (linking spans across services), add Grafana Tempo to the compose stack (`otlphttp/tempo` exporter in `otel-collector/config.yaml`) and wire it as a Grafana datasource. The current setup uses the `debug` exporter, which emits trace summaries to the OTel Collector container log.
+Tempo persists spans from all 8 services (24 h retention in local dev). Query by `trace_id` in Grafana → Explore → Tempo datasource for a full service waterfall. Loki `derivedFields` extract `trace_id` from any log line and render a **View Trace** button linking directly to that trace in Tempo.
 
 ---
 
@@ -734,4 +736,5 @@ For distributed **trace** storage (linking spans across services), add Grafana T
 | Prometheus alerts config | [infra/observability/prometheus/alerts.yml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/prometheus/alerts.yml) |
 | Grafana reliability dashboard | [infra/observability/grafana/dashboards/reliability.json](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/grafana/dashboards/reliability.json) |
 | OTel Collector config | [infra/observability/otel-collector/config.yaml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/otel-collector/config.yaml) |
+| Tempo config | [infra/observability/tempo/tempo.yaml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/tempo/tempo.yaml) |
 | Promtail config | [infra/observability/promtail/promtail-config.yaml](https://github.com/stevelefi/autotrading-implementation/blob/main/infra/observability/promtail/promtail-config.yaml) |
