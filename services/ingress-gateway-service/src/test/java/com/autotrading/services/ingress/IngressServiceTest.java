@@ -8,6 +8,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.tracing.Tracer;
+
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.kafka.KafkaFirstPublisher;
 import com.autotrading.services.ingress.api.IngressAcceptedResponse;
@@ -47,12 +49,14 @@ class IngressServiceTest {
     });
     when(mockRawRepo.findByIdempotencyKey(any())).thenAnswer(inv ->
         Optional.ofNullable(entityStore.get((String) inv.getArgument(0))));
+    // Tracer mock returns null for currentSpan() — exercises the UUID fallback path
     service = new IngressService(
         new InMemoryIdempotencyService(),
         mockKafkaFirstPublisher,
         mockRawRepo,
         new ObjectMapper().registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
+        mock(Tracer.class));
   }
 
   @AfterEach
