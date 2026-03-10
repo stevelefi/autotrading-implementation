@@ -156,6 +156,81 @@ def seed_smoke_auth_db() -> None:
         _psql(sql)
 
 
+def wait_for_auth_ready(ingress_url: str, timeout_sec: int = 90) -> None:
+    """
+    Called immediately after seed_smoke_auth_db().
+
+    Step 1 — wiring probe:
+      Send a one-time request with a deliberately unknown key.
+      If ingress returns 202  → auth is NOT wired (stack running old code).
+        Raise immediately with a clear "restart-app" hint.
+      If ingress returns 401  → auth is wired, proceed to step 2.
+      Any other status is also treated as "auth not wired" and raises.
+
+    Step 2 — cache warmup poll:
+      The ApiKeyAuthenticator cache loaded at app startup *before* Phase 0
+      seeded the smoke fixtures.  Poll until the smoke key is accepted
+      (returns 202) so that phases 2–6 all use a warm cache.
+      Timeout after timeout_sec with a descriptive error.
+    """
+    probe_payload = {
+        "client_event_id": f"smoke-auth-probe-{utc_ts()}",
+        "event_intent":    "TRADE_SIGNAL",
+        "agent_id":        SMOKE_AGENT_ID,
+        "payload":         {"side": "BUY", "qty": 1},
+    }
+    probe_headers = {
+        "Authorization": "Bearer smoke-auth-probe-detect-wiring-xyz",
+        "X-Request-Id":  "smoke-auth-probe-detect",
+    }
+
+    print("  [auth probe] checking auth is wired in running stack ...", flush=True)
+    r = http_json("POST", f"{ingress_url}/ingress/v1/events", probe_payload, probe_headers)
+    if r.status != 401:
+        raise RuntimeError(
+            f"Auth is NOT wired in the running stack "
+            f"(probe with unknown key returned {r.status}, expected 401). "
+            f"Run:  python3 scripts/stack.py restart-app"
+        )
+    print("  [auth probe] auth wired ✓ (unknown key → 401)", flush=True)
+
+    # Step 2 — wait for smoke key to appear in the auth cache
+    warmup_payload = {
+        "client_event_id": f"smoke-auth-warmup-{utc_ts()}",
+        "event_intent":    "TRADE_SIGNAL",
+        "agent_id":        SMOKE_AGENT_ID,
+        "payload":         {"side": "BUY", "qty": 1},
+    }
+    warmup_headers = {
+        "Authorization": f"Bearer {SMOKE_RAW_KEY}",
+        "X-Request-Id":  "smoke-auth-warmup",
+    }
+
+    end = time.time() + timeout_sec
+    print("  [auth probe] waiting for smoke key to appear in auth cache ...", flush=True)
+    while time.time() < end:
+        r = http_json("POST", f"{ingress_url}/ingress/v1/events", warmup_payload, warmup_headers)
+        if r.status == 202:
+            print("  [auth probe] auth cache warm ✓ (smoke key accepted → 202)", flush=True)
+            return
+        if r.status == 401:
+            elapsed = int(timeout_sec - (end - time.time()))
+            print(f"  [auth probe] cache not yet refreshed "
+                  f"({elapsed}s elapsed) — retrying in 3s ...", flush=True)
+            time.sleep(3)
+            # rotate the idempotency key so the next attempt is not a replay
+            warmup_payload["client_event_id"] = f"smoke-auth-warmup-{utc_ts()}"
+        else:
+            raise RuntimeError(
+                f"Unexpected status {r.status} during auth cache warmup "
+                f"(body: {r.body_text[:200]})"
+            )
+    raise RuntimeError(
+        f"Auth cache warmup timed out after {timeout_sec}s — "
+        f"smoke key '{SMOKE_RAW_KEY}' was never accepted by the running service."
+    )
+
+
 def phase_six_auth_checks(ingress_url: str, details: dict) -> list[str]:
     """
     Phase 6 — Auth edge-case checks:
@@ -342,6 +417,8 @@ def main() -> int:
         print("\n=== Phase 0: seed auth DB ===", flush=True)
         seed_smoke_auth_db()
         print("  smoke auth fixtures seeded (accounts, agents, keys, broker-accounts)", flush=True)
+        wait_for_auth_ready(ingress_url)
+        summaries.append("Auth DB seeded and cache warm (smoke key accepted by running service)")
 
         print("\n=== Phase 1: service readiness ===", flush=True)
         for name, url in services.items():
