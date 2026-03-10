@@ -1,6 +1,6 @@
 # Debug Smoke Failures
 
-Use this prompt when `python3 scripts/smoke_local.py` exits non-zero or a phase reports FAIL.
+Use this prompt when `python3 scripts/test.py smoke` (or `python3 scripts/smoke_local.py` directly) exits non-zero or a phase reports FAIL.
 
 ---
 
@@ -149,6 +149,17 @@ owns the smoke key. Check the seed in `seed_smoke_auth_db()`.
 ## General Tips
 
 ```bash
+# Re-run the smoke suite
+python3 scripts/test.py smoke
+
+# Run only the Maven suite (no stack needed)
+python3 scripts/test.py unit
+python3 scripts/test.py coverage
+python3 scripts/test.py e2e
+
+# Run one module's unit tests quickly
+python3 scripts/test.py unit --module services/ingress-gateway-service
+
 # Tail all service logs
 python3 scripts/stack.py logs
 

@@ -113,11 +113,17 @@ python3 scripts/stack.py infra-up
 docker logs flyway-init-1 2>&1 | tail -20
 # Must end with: "Successfully applied N migrations to schema "public""
 
-# 3. Run smoke to verify no regressions
-python3 scripts/smoke_local.py
+# 3. Run e2e (FlywayMigrationTest validates schema + count)
+python3 scripts/test.py e2e
 
-# 4. Add to FlywayMigrationTest.java assertion (count check)
-# In tests/e2e/ → FlywayMigrationTest → update expected migration count
+# 4. Run unit tests to catch any Java breakage
+python3 scripts/test.py unit
+
+# 5. Run the live smoke suite for full regression
+python3 scripts/test.py smoke
+
+# 6. All three at once (stack must be up for smoke)
+python3 scripts/test.py full
 ```
 
 ---

@@ -153,6 +153,28 @@ void consume_deduplicates_on_second_delivery() {
 
 For E2E coverage, add a test in `tests/e2e/` extending or creating a `<Feature>Test.java`.
 
+### Run tests after implementation
+
+```bash
+# Unit tests for the specific service module
+python3 scripts/test.py unit --module services/<your-service>
+
+# All unit tests (validates nothing else broke)
+python3 scripts/test.py unit
+
+# Coverage gate — must stay ≥ 50% on core modules
+python3 scripts/test.py coverage
+
+# E2E tests — catches integration-level regressions
+python3 scripts/test.py e2e
+
+# Full live pipeline test (requires stack up)
+python3 scripts/test.py smoke
+
+# Run all Maven suites at once
+python3 scripts/test.py all
+```
+
 ---
 
 ## Checklist
@@ -163,5 +185,7 @@ For E2E coverage, add a test in `tests/e2e/` extending or creating a `<Feature>T
 - [ ] `MDC.clear()` in `finally`
 - [ ] Error handling: `DuplicateKeyException` (dedup) vs unexpected errors (let propagate → Kafka retry)
 - [ ] `application.yml` / `application-local.yml` updated with topic name
-- [ ] Unit test covers dedup
+- [ ] Unit test covers dedup: `python3 scripts/test.py unit --module services/<your-service>` passes
+- [ ] `python3 scripts/test.py e2e` — all 5 classes green
+- [ ] `python3 scripts/test.py coverage` — module stays above 50% threshold
 - [ ] `consumer_inbox` schema already exists — provided by V1 migration

@@ -244,8 +244,8 @@ Add `io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter` to `pom
 
 ## Step 9 — Health Readiness Check
 
-`scripts/smoke_local.py` Phase 1 checks all 8 services. Update the service list in
-`smoke_local.py` and `scripts/test.py` (if the service count constant is hardcoded).
+`scripts/test.py smoke` (Phase 1) checks all 8 services. Update the service list in
+`smoke_local.py` and `scripts/stack.py`'s APP_SERVICES constant.
 
 ---
 
@@ -303,6 +303,8 @@ helm template trading-service infra/helm/charts/trading-service \
 - [ ] Flyway migration for any new tables (if needed)
 - [ ] Helm chart entry (if production deployment)
 - [ ] `README.md` updated
-- [ ] Unit tests with `≥ 50%` line coverage
-- [ ] `python3 scripts/check.py` all green
-- [ ] `python3 scripts/smoke_local.py` all 6 phases pass
+- [ ] `python3 scripts/test.py unit --module services/my-new-service` — 0 failures
+- [ ] `python3 scripts/test.py coverage` — new module meets ≥ 50% threshold (if it is a core module)
+- [ ] `python3 scripts/test.py e2e` — all 5 E2E classes still green
+- [ ] `python3 scripts/test.py smoke` — all 6 phases pass (Phase 1 must include new service)
+- [ ] `python3 scripts/check.py` — all 7 checks green

@@ -26,6 +26,8 @@ python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSIO
 # 3. Unit tests — zero failures tolerated
 python3 scripts/test.py unit
 # Expect: BUILD SUCCESS, all tests green
+# Target a single module during iteration:
+python3 scripts/test.py unit --module services/risk-service
 
 # 4. JaCoCo coverage gate (≥ 50% line coverage on 5 core modules)
 python3 scripts/test.py coverage
@@ -43,14 +45,23 @@ helm template trading-service infra/helm/charts/trading-service \
 
 # 7. Smoke suite (requires live stack)
 python3 scripts/stack.py up
-python3 scripts/smoke_local.py   # must exit 0 — 6 phases
+python3 scripts/test.py smoke   # must exit 0 — 6 phases
 python3 scripts/stack.py down
 # Write smoke report path to PR body
 ```
 
-### Fast iteration (skip e2e)
+### Shortcuts — run several suites at once
 ```bash
-python3 scripts/check.py --fast
+# Maven only (no stack needed)
+python3 scripts/test.py all                  # unit + coverage + e2e (fail-fast by default)
+python3 scripts/test.py all --no-fail-fast   # run all suites even if one fails
+
+# Full CI equivalent (stack must be up for smoke)
+python3 scripts/test.py full                 # unit + coverage + e2e + smoke
+
+# pre-commit gate (all 7 checks including Helm)
+python3 scripts/check.py --fast              # skips e2e — fast iteration
+python3 scripts/check.py                     # full gate before final commit
 ```
 
 ---
@@ -72,8 +83,9 @@ Pinned spec: `spec-v1.0.1-m0m1` (from `SPEC_VERSION.json`)
 
 ## Test Evidence
 - Unit tests: `python3 scripts/test.py unit` — all green
-- Coverage: above 50% on all 5 core modules
-- E2E: all 5 test classes green
+- Coverage: `python3 scripts/test.py coverage` — all 5 modules ≥ 50%
+- E2E: `python3 scripts/test.py e2e` — all 5 test classes green
+- Smoke: `python3 scripts/test.py smoke` — all 6 phases pass
 - Smoke report: `reports/blitz/e2e-results/smoke-local-<timestamp>.md`
 
 ## Migration Evidence (if applicable)
@@ -86,10 +98,10 @@ Successfully applied N migrations to schema "public"
 - [ ] `python3 scripts/branch_check.py` prints OK
 - [ ] `python3 tools/spec_sync.py verify …` passes
 - [ ] `python3 scripts/test.py unit` — 0 failures
-- [ ] `python3 scripts/test.py coverage` — all modules ≥ 50%
+- [ ] `python3 scripts/test.py coverage` — all 5 modules ≥ 50%
 - [ ] `python3 scripts/test.py e2e` — all 5 classes green
 - [ ] Helm lint + template render pass
-- [ ] `python3 scripts/smoke_local.py` exits 0
+- [ ] `python3 scripts/test.py smoke` exits 0 — all 6 phases
 - [ ] No secrets staged (`git diff --staged | grep -i password`)
 - [ ] No `target/` directories staged
 - [ ] No hard-coded image tags in `values.yaml`
