@@ -5,7 +5,7 @@ trace.py — Query Loki for log lines matching autotrading MDC fields.
 Examples
 --------
   python3 scripts/trace.py --trace-id trc-abc-123
-  python3 scripts/trace.py --idempotency-key k-abc-123
+  python3 scripts/trace.py --client-event-id k-abc-123
   python3 scripts/trace.py --agent-id agent-alpha --since 30m
   python3 scripts/trace.py --order-intent-id oi-xyz-789 --service order-service
   python3 scripts/trace.py --trace-id trc-abc-123 --level ERROR

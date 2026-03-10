@@ -67,7 +67,7 @@ python3 scripts/smoke_local.py
 python3 scripts/stack.py down
 ```
 - `scripts/stack.py up` — brings up infra + all 8 app services in dependency order
-- `scripts/smoke_local.py` — runs the 5-phase smoke suite (see table below)
+- `scripts/smoke_local.py` — runs the 6-phase smoke suite (see table below)
 - `scripts/stack.py down` — full teardown including volumes
 
 ### Full CI simulation
@@ -87,15 +87,16 @@ python3 scripts/stack.py logs          # tail all service logs
 ```
 
 ### Smoke suite — what "PASS" means
-`scripts/smoke_local.py` runs 5 phases sequentially; any failure exits non-zero:
+`scripts/smoke_local.py` runs 6 phases sequentially; any failure exits non-zero:
 
 | Phase | What it checks |
 |-------|---------------|
 | 1 — Readiness | All 8 services return `{"status":"UP"}` on `/actuator/health/readiness` (360 s timeout) |
-| 2 — Ingress idempotency | Duplicate `idempotency_key` returns 202 with same `ingress_event_id`; conflicting payload returns 409 |
+| 2 — Ingress idempotency | Duplicate `client_event_id` returns 202 with same `event_id` (first-write-wins); conflicting payload on same key also returns 202 replaying the original |
 | 3 — Command path | Risk → Order → IBKR; two identical risk calls produce exactly one broker submit (dedup) |
 | 4 — Timeout freeze drill | 60 s watchdog triggers `trading_mode=FROZEN`, alert present on `system.alerts.v1` |
 | 5 — Async Kafka pipeline | End-to-end ingress POST → broker `total_submit_count` increments within 90 s |
+| 6 — Auth edge cases | Missing header → 400; non-Bearer scheme → 400; unknown key → 401; cross-account agent → 403; valid key + owned agent → 202 |
 
 ### Evidence artefacts
 Smoke writes results to:
@@ -191,8 +192,8 @@ python3 scripts/stack.py down         # full teardown including volumes
 | `scripts/test.py` | Maven test runner | `unit` \| `coverage` \| `e2e` \| `all` — add `--module <path>` to target one module |
 | `scripts/check.py` | Pre-commit gate (all checks + summary) | *(no args)* full gate; `--fast` skips e2e; `--skip-helm` skips Helm; `--only <check>...` |
 | `scripts/stack.py` | Local stack manager | `up` \| `down` \| `infra-up` \| `app-up` \| `app-down` \| `restart-app` \| `build` \| `status` \| `logs` \| `validate` \| `ci` |
-| `scripts/smoke_local.py` | 5-phase smoke suite (requires stack up) | *(no args)* — writes reports to `reports/blitz/` |
-| `scripts/trace.py` | Query Loki logs by MDC field | `--trace-id` \| `--idempotency-key` \| `--agent-id` \| `--order-intent-id` \| `--signal-id` \| `--service` \| `--since` |
+| `scripts/smoke_local.py` | 6-phase smoke suite (requires stack up) | *(no args)* — writes reports to `reports/blitz/` |
+| `scripts/trace.py` | Query Loki logs by MDC field | `--trace-id` \| `--client-event-id` \| `--agent-id` \| `--order-intent-id` \| `--signal-id` \| `--service` \| `--since` |
 
 ## Change Control
 1. Any contract change starts in spec repo, not here.

@@ -66,6 +66,12 @@ def mvn(*args: str, check: bool = True) -> int:
 
 def cmd_unit(module: str | None = None) -> None:
     banner("Unit tests")
+    # Reinstall the contracts module before running tests to ensure the
+    # protobuf-generated classes in ~/.m2 match the reactor's compiled output.
+    # Without this, a prior clean resets target/ but leaves a stale snapshot
+    # in the local repo, causing NoSuchMethodError on synthetic accessor
+    # methods (e.g. CancelOrderRequest.access$N) in ibkr-connector tests.
+    mvn("-B", "-DskipTests", "install", "-pl", "libs/contracts")
     if module:
         mvn("-B", "-DskipITs=true", "-pl", module, "-am", "test")
     else:

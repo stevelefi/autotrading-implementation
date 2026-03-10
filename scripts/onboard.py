@@ -102,9 +102,6 @@ def _select(sql: str) -> list[dict[str, str]]:
         ]
         env = {**os.environ, "PGPASSWORD": POSTGRES_PASSWORD}
 
-    # First run with headers to get column names
-    header_cmd = [*cmd[:-2], "--no-tuples-only", "-c", sql]
-    # Simpler: just use a known column order per query type
     result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
         raise RuntimeError(
