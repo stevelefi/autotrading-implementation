@@ -51,7 +51,7 @@ class BrokerConnectorEngineTest {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-1")
             .setRequestId("req-1")
-            .setIdempotencyKey("idem-1")
+            .setClientEventId("idem-1")
             .setPrincipalId("svc-order")
             .build())
         .setAgentId("agent-1")
@@ -82,15 +82,15 @@ class BrokerConnectorEngineTest {
   }
 
   @Test
-  void sameIdempotencyKeyWithDifferentPayloadIsRejected() {
+  void sameClientEventIdWithDifferentPayloadReturnsDuplicate() {
     SubmitOrderRequest first = baseSubmitRequest("idem-conflict", "ord-1", 10);
     SubmitOrderRequest conflicting = baseSubmitRequest("idem-conflict", "ord-1", 20);
 
     var accepted = engine.submit(first);
-    var rejected = engine.submit(conflicting);
+    var duplicate = engine.submit(conflicting);
 
     assertThat(accepted.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_ACCEPTED);
-    assertThat(rejected.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_REJECTED);
+    assertThat(duplicate.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_DUPLICATE);
     assertThat(engine.submitCount("ord-1")).isEqualTo(1);
   }
 
@@ -135,7 +135,7 @@ class BrokerConnectorEngineTest {
     return RequestContext.newBuilder()
         .setTraceId("trc-1")
         .setRequestId("req-1")
-        .setIdempotencyKey(idem)
+        .setClientEventId(idem)
         .setPrincipalId("svc-order")
         .build();
   }

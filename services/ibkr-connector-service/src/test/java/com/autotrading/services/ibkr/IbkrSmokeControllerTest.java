@@ -52,7 +52,7 @@ class IbkrSmokeControllerTest {
                 .setRequestContext(RequestContext.newBuilder()
                         .setTraceId("trc-1")
                         .setRequestId("req-1")
-                        .setIdempotencyKey("idem-smoke-1")
+                        .setClientEventId("idem-smoke-1")
                         .setPrincipalId("svc-order")
                         .build())
                 .setOrderIntentId("ord-smoke-1")

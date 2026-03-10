@@ -23,8 +23,8 @@ public class OrderIntentEntity implements Persistable<String> {
   @Column("instrument_id")
   private String instrumentId;
 
-  @Column("idempotency_key")
-  private String idempotencyKey;
+  @Column("client_event_id")
+  private String clientEventId;
 
   @Column("side")
   private String side;
@@ -49,14 +49,14 @@ public class OrderIntentEntity implements Persistable<String> {
   protected OrderIntentEntity() {}
 
   public OrderIntentEntity(String orderIntentId, String signalId, String agentId,
-                            String instrumentId, String idempotencyKey, String side,
+                            String instrumentId, String clientEventId, String side,
                             int qty, String orderType, String timeInForce,
                             Instant submissionDeadline, Instant createdAt) {
     this.orderIntentId = orderIntentId;
     this.signalId = signalId;
     this.agentId = agentId;
     this.instrumentId = instrumentId;
-    this.idempotencyKey = idempotencyKey;
+    this.clientEventId = clientEventId;
     this.side = side;
     this.qty = qty;
     this.orderType = orderType;
@@ -70,7 +70,7 @@ public class OrderIntentEntity implements Persistable<String> {
   public String getSignalId() { return signalId; }
   public String getAgentId() { return agentId; }
   public String getInstrumentId() { return instrumentId; }
-  public String getIdempotencyKey() { return idempotencyKey; }
+  public String getClientEventId() { return clientEventId; }
   public String getSide() { return side; }
   public int getQty() { return qty; }
   public String getOrderType() { return orderType; }

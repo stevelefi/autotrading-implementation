@@ -141,7 +141,7 @@ class OrderSafetyEngineTest {
   }
 
   @Test
-  void idempotencyConflictRejectsSecondRequestWithDifferentPayload() throws IOException {
+  void sameKeyDifferentPayloadReturnsDuplicate() throws IOException {
     AtomicInteger submitCount = new AtomicInteger();
     BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub = startBroker(submitCount);
 
@@ -156,11 +156,10 @@ class OrderSafetyEngineTest {
     CreateOrderIntentRequest first = baseRequest("idem-conflict");
     CreateOrderIntentRequest conflicting = first.toBuilder().setQty(999).build();
     var accepted = engine.createOrderIntent(first, brokerStub);
-    var rejected = engine.createOrderIntent(conflicting, brokerStub);
+    var duplicate = engine.createOrderIntent(conflicting, brokerStub);
 
     assertThat(accepted.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_ACCEPTED);
-    assertThat(rejected.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_REJECTED);
-    assertThat(rejected.getReasonsList()).containsExactly("idempotency conflict");
+    assertThat(duplicate.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_DUPLICATE);
     assertThat(submitCount.get()).isEqualTo(1);
   }
 
@@ -188,12 +187,12 @@ class OrderSafetyEngineTest {
     return BrokerCommandServiceGrpc.newBlockingStub(channel);
   }
 
-  private static CreateOrderIntentRequest baseRequest(String idempotencyKey) {
+  private static CreateOrderIntentRequest baseRequest(String clientEventId) {
     return CreateOrderIntentRequest.newBuilder()
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-1")
             .setRequestId("req-1")
-            .setIdempotencyKey(idempotencyKey)
+            .setClientEventId(clientEventId)
             .setPrincipalId("svc-risk")
             .build())
         .setAgentId("agent-1")

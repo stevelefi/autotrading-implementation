@@ -35,46 +35,46 @@ public class EventProcessorQaController {
   public Map<String, String> seed(@RequestBody Map<String, Object> req) {
     String tradeEventId   = "qa-trade-"   + UUID.randomUUID();
     String traceId        = str(req, "traceId", "qa-trace-" + UUID.randomUUID());
-    String idempotencyKey = str(req, "idempotencyKey", "qa-idem-" + UUID.randomUUID());
+    String clientEventId  = str(req, "clientEventId", "qa-cev-" + UUID.randomUUID());
     String agentId        = str(req, "agentId", "qa-agent");
     String rawEventId     = str(req, "rawEventId", "qa-raw-" + UUID.randomUUID());
 
     jdbc.update(
         "INSERT INTO routed_trade_events "
-        + "(trade_event_id, raw_event_id, ingress_event_id, trace_id, idempotency_key, "
+        + "(trade_event_id, raw_event_id, event_id, trace_id, client_event_id, "
         + " agent_id, source_type, source_event_id, canonical_payload_json, "
         + " instrument_id, route_topic, routing_status, created_at, routed_at) "
-        + "VALUES (:tradeEventId, :rawEventId, :ingressEventId, :traceId, :idempotencyKey, "
+        + "VALUES (:tradeEventId, :rawEventId, :eventId, :traceId, :clientEventId, "
         + " :agentId, 'QA', NULL, '{\"qa\":true}', "
         + " 'QA_INSTRUMENT', 'qa.signals.v1', 'ROUTED', :now, :now)",
         new MapSqlParameterSource()
             .addValue("tradeEventId",   tradeEventId)
             .addValue("rawEventId",     rawEventId)
-            .addValue("ingressEventId", "qa-ingress-" + UUID.randomUUID())
+            .addValue("eventId",       "qa-event-" + UUID.randomUUID())
             .addValue("traceId",        traceId)
-            .addValue("idempotencyKey", idempotencyKey)
+            .addValue("clientEventId", clientEventId)
             .addValue("agentId",        agentId)
             .addValue("now",            Timestamp.from(Instant.now())));
 
     return Map.of(
         "trade_event_id",  tradeEventId,
         "trace_id",        traceId,
-        "idempotency_key", idempotencyKey);
+        "client_event_id", clientEventId);
   }
 
   @GetMapping("/state")
   public List<Map<String, Object>> state(
       @RequestParam(required = false) String traceId,
-      @RequestParam(required = false) String idempotencyKey,
+      @RequestParam(required = false) String clientEventId,
       @RequestParam(required = false) String agentId) {
     if (traceId != null) {
       return jdbc.queryForList(
           "SELECT * FROM routed_trade_events WHERE trace_id = :v", Map.of("v", traceId));
     }
-    if (idempotencyKey != null) {
+    if (clientEventId != null) {
       return jdbc.queryForList(
-          "SELECT * FROM routed_trade_events WHERE idempotency_key = :v",
-          Map.of("v", idempotencyKey));
+          "SELECT * FROM routed_trade_events WHERE client_event_id = :v",
+          Map.of("v", clientEventId));
     }
     if (agentId != null) {
       return jdbc.queryForList(
@@ -94,7 +94,7 @@ public class EventProcessorQaController {
     }
     if (testRunPrefix != null) {
       deleted += jdbc.update(
-          "DELETE FROM routed_trade_events WHERE idempotency_key LIKE :v",
+          "DELETE FROM routed_trade_events WHERE client_event_id LIKE :v",
           Map.of("v", testRunPrefix + "%"));
     }
     return Map.of("deleted_rows", deleted);

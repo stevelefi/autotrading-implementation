@@ -5,7 +5,7 @@ import org.springframework.data.repository.ListCrudRepository;
 
 public interface RoutedTradeEventRepository extends ListCrudRepository<RoutedTradeEventEntity, String> {
 
-  Optional<RoutedTradeEventEntity> findByIngressEventId(String ingressEventId);
+  Optional<RoutedTradeEventEntity> findByEventId(String eventId);
 
-  boolean existsByIdempotencyKey(String idempotencyKey);
+  boolean existsByClientEventId(String clientEventId);
 }

@@ -47,7 +47,7 @@ class BrokerCommandGrpcServiceTest {
         return RequestContext.newBuilder()
                 .setTraceId("trc-1")
                 .setRequestId("req-1")
-                .setIdempotencyKey(idem)
+                .setClientEventId(idem)
                 .setPrincipalId("svc-order")
                 .build();
     }

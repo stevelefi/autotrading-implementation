@@ -15,11 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * JDBC-backed {@link IdempotencyService} using the {@code idempotency_records} table (V1 migration).
  *
- * <h3>claim() semantics</h3>
+ * <h3>claim() semantics — first-write-wins</h3>
  * <ul>
  *   <li>First caller → INSERT row as PENDING → {@link ClaimOutcome#CLAIMED}
- *   <li>Duplicate key with matching payload_hash and status COMPLETED/FAILED → {@link ClaimOutcome#REPLAY}
- *   <li>Duplicate key with different payload_hash or still PENDING → {@link ClaimOutcome#CONFLICT}
+ *   <li>Duplicate client_event_id (any payload, any status) → {@link ClaimOutcome#REPLAY};
+ *       the original response is returned to the caller unchanged.
  * </ul>
  */
 public class JdbcIdempotencyService implements IdempotencyService {
@@ -40,9 +40,9 @@ public class JdbcIdempotencyService implements IdempotencyService {
     int inserted = jdbc.update(
         """
         INSERT INTO idempotency_records
-               (idempotency_key, payload_hash, status, created_at_utc, updated_at_utc)
-        VALUES (?,                ?,            'PENDING', ?,             ?)
-        ON CONFLICT (idempotency_key) DO NOTHING
+               (client_event_id, payload_hash, status, created_at_utc, updated_at_utc)
+               VALUES (?,               ?,            'PENDING', ?,             ?)
+        ON CONFLICT (client_event_id) DO NOTHING
         """,
         claim.key(),
         claim.payloadHash(),
@@ -59,16 +59,11 @@ public class JdbcIdempotencyService implements IdempotencyService {
     // Row already exists — determine the outcome from the existing record.
     Optional<IdempotencyRecord> existing = find(claim.key());
     if (existing.isEmpty()) {
-      return new ClaimResult(ClaimOutcome.CONFLICT, null, "concurrent insert race");
+      // Race between two concurrent inserts — treat as replay (first writer won).
+      return new ClaimResult(ClaimOutcome.REPLAY, null, "concurrent insert race — first-write-wins");
     }
-    IdempotencyRecord rec = existing.get();
-    if (!rec.payloadHash().equals(claim.payloadHash())) {
-      return new ClaimResult(ClaimOutcome.CONFLICT, rec, "payload hash mismatch");
-    }
-    if (rec.status() == IdempotencyStatus.PENDING) {
-      return new ClaimResult(ClaimOutcome.CONFLICT, rec, "in-flight duplicate");
-    }
-    return new ClaimResult(ClaimOutcome.REPLAY, rec, "replay");
+    // First-write-wins: any duplicate key returns REPLAY regardless of payload or status.
+    return new ClaimResult(ClaimOutcome.REPLAY, existing.get(), "first-write-wins: return original response");
   }
 
   @Override
@@ -78,7 +73,7 @@ public class JdbcIdempotencyService implements IdempotencyService {
         """
         UPDATE idempotency_records
            SET status = 'COMPLETED', response_snapshot = ?, updated_at_utc = ?
-         WHERE idempotency_key = ?
+         WHERE client_event_id = ?
         """,
         responseSnapshot,
         Timestamp.from(Instant.now()),
@@ -92,7 +87,7 @@ public class JdbcIdempotencyService implements IdempotencyService {
         """
         UPDATE idempotency_records
            SET status = 'FAILED', failure_reason = ?, updated_at_utc = ?
-         WHERE idempotency_key = ?
+         WHERE client_event_id = ?
         """,
         failureReason,
         Timestamp.from(Instant.now()),
@@ -103,9 +98,9 @@ public class JdbcIdempotencyService implements IdempotencyService {
   public Optional<IdempotencyRecord> find(String key) {
     List<IdempotencyRecord> rows = jdbc.query(
         """
-        SELECT idempotency_key, payload_hash, status, response_snapshot, failure_reason, updated_at_utc
+        SELECT client_event_id, payload_hash, status, response_snapshot, failure_reason, updated_at_utc
           FROM idempotency_records
-         WHERE idempotency_key = ?
+         WHERE client_event_id = ?
         """,
         this::mapRow,
         key);
@@ -114,7 +109,7 @@ public class JdbcIdempotencyService implements IdempotencyService {
 
   private IdempotencyRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
     return new IdempotencyRecord(
-        rs.getString("idempotency_key"),
+        rs.getString("client_event_id"),
         rs.getString("payload_hash"),
         IdempotencyStatus.valueOf(rs.getString("status")),
         rs.getString("response_snapshot"),

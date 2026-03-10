@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.util.Map;
 
 public record NormalizedIngressEvent(
-    String ingressEventId,
+    String eventId,
     String rawEventId,
     String traceId,
-    String idempotencyKey,
+    String clientEventId,
     String sourceType,
     String sourceEventId,
     String agentId,

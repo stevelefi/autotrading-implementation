@@ -113,7 +113,7 @@ class RiskSmokeControllerTest {
         RiskSmokeController controller = new RiskSmokeController(riskService);
 
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
-        payload.put("idempotency_key", "my-idem-key");
+        payload.put("client_event_id", "my-idem-key");
         payload.put("signal_id", "my-sig");
         payload.put("qty", "2");
         payload.put("side", "SELL");
@@ -139,12 +139,12 @@ class RiskSmokeControllerTest {
         assertThat(stats.get("policy_audit_event_count")).isEqualTo(2);
     }
 
-    private static EvaluateSignalRequest fullRequest(String idempotencyKey) {
+    private static EvaluateSignalRequest fullRequest(String clientEventId) {
         return EvaluateSignalRequest.newBuilder()
                 .setRequestContext(RequestContext.newBuilder()
                         .setTraceId("trc-1")
                         .setRequestId("req-1")
-                        .setIdempotencyKey(idempotencyKey)
+                        .setClientEventId(clientEventId)
                         .setPrincipalId("svc-agent")
                         .build())
                 .setAgentId("agent-1")

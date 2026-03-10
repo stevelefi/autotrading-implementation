@@ -62,18 +62,18 @@ public class MonitoringController {
       @RequestHeader("X-Actor-Id") String actorId,
       @RequestHeader("X-Request-Id") String requestId,
       @RequestBody Map<String, Object> body) {
-    String idempotencyKey = String.valueOf(body.get("idempotency_key"));
-    Map<String, Object> forwarded = ingressForwarder.forward(idempotencyKey, body, "TRADER_UI");
-    return ResponseEntity.accepted().body(Map.of("trace_id", "trc-" + requestId, "data", forwarded));
+    String clientEventId = String.valueOf(body.get("client_event_id"));
+    Map<String, Object> forwarded = ingressForwarder.forward(clientEventId, body, "TRADER_UI");
+    return ResponseEntity.accepted().body(Map.of("event_id", forwarded.get("event_id"), "data", forwarded));
   }
 
   @PostMapping("/trade-events/external")
   public ResponseEntity<Map<String, Object>> externalTradeEvent(
       @RequestHeader("X-Request-Id") String requestId,
       @RequestBody Map<String, Object> body) {
-    String idempotencyKey = String.valueOf(body.get("idempotency_key"));
-    Map<String, Object> forwarded = ingressForwarder.forward(idempotencyKey, body, "EXTERNAL_SYSTEM");
-    return ResponseEntity.accepted().body(Map.of("trace_id", "trc-" + requestId, "data", forwarded));
+    String clientEventId = String.valueOf(body.get("client_event_id"));
+    Map<String, Object> forwarded = ingressForwarder.forward(clientEventId, body, "EXTERNAL_SYSTEM");
+    return ResponseEntity.accepted().body(Map.of("event_id", forwarded.get("event_id"), "data", forwarded));
   }
 
   @GetMapping("/system/health")

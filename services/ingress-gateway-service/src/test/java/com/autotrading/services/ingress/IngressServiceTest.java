@@ -1,7 +1,6 @@
 package com.autotrading.services.ingress;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -29,7 +28,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.web.server.ResponseStatusException;
 
 class IngressServiceTest {
 
@@ -44,10 +42,10 @@ class IngressServiceTest {
     IngressRawEventRepository mockRawRepo = mock(IngressRawEventRepository.class);
     when(mockRawRepo.save(any())).thenAnswer(inv -> {
       IngressRawEventEntity e = inv.getArgument(0);
-      entityStore.put(e.getIdempotencyKey(), e);
+      entityStore.put(e.getClientEventId(), e);
       return e;
     });
-    when(mockRawRepo.findByIdempotencyKey(any())).thenAnswer(inv ->
+    when(mockRawRepo.findByClientEventId(any())).thenAnswer(inv ->
         Optional.ofNullable(entityStore.get((String) inv.getArgument(0))));
     // Tracer mock returns null for currentSpan() — exercises the UUID fallback path
     service = new IngressService(
@@ -93,13 +91,13 @@ class IngressServiceTest {
     IngressAcceptedResponse second = service.accept(request, "req-2", "Bearer token");
     simulateCommit();
 
-    assertThat(first.data().ingress_event_id()).isEqualTo(second.data().ingress_event_id());
+    assertThat(first.event_id()).isEqualTo(second.event_id());
     verify(mockKafkaFirstPublisher, times(1)).publish(any(), any(), any());
   }
 
   @Test
-  void sameKeyDifferentPayloadReturnsConflict() {
-    service.accept(new IngressSubmitRequest(
+  void sameKeyDifferentPayloadAlsoReturnsReplay() {
+    IngressAcceptedResponse first = service.accept(new IngressSubmitRequest(
         "idemp-1",
         "TRADE_SIGNAL",
         "agent-1",
@@ -108,14 +106,16 @@ class IngressServiceTest {
         Map.of("side", "BUY", "qty", 10)), "req-1", "Bearer token");
     simulateCommit();
 
-    assertThatThrownBy(() -> service.accept(new IngressSubmitRequest(
+    IngressAcceptedResponse second = service.accept(new IngressSubmitRequest(
         "idemp-1",
         "TRADE_SIGNAL",
         "agent-1",
         null,
         null,
-        Map.of("side", "BUY", "qty", 20)), "req-2", "Bearer token"))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("409 CONFLICT");
+        Map.of("side", "BUY", "qty", 20)), "req-2", "Bearer token");
+    simulateCommit();
+
+    assertThat(second.event_id()).isEqualTo(first.event_id());
+    verify(mockKafkaFirstPublisher, times(1)).publish(any(), any(), any());
   }
 }

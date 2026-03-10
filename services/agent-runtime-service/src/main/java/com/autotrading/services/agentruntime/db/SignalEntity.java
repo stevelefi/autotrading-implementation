@@ -23,8 +23,8 @@ public class SignalEntity implements Persistable<String> {
   @Column("instrument_id")
   private String instrumentId;
 
-  @Column("idempotency_key")
-  private String idempotencyKey;
+  @Column("client_event_id")
+  private String clientEventId;
 
   @Column("source_type")
   private String sourceType = "AGENT_RUNTIME";
@@ -49,14 +49,14 @@ public class SignalEntity implements Persistable<String> {
   protected SignalEntity() {}
 
   public SignalEntity(String signalId, String tradeEventId, String agentId, String instrumentId,
-                      String idempotencyKey, String sourceType, String sourceEventId,
+                      String clientEventId, String sourceType, String sourceEventId,
                       String originSourceType, String originSourceEventId,
                       String rawPayloadJson, Instant signalTs) {
     this.signalId = signalId;
     this.tradeEventId = tradeEventId;
     this.agentId = agentId;
     this.instrumentId = instrumentId;
-    this.idempotencyKey = idempotencyKey;
+    this.clientEventId = clientEventId;
     this.sourceType = sourceType;
     this.sourceEventId = sourceEventId;
     this.originSourceType = originSourceType;
@@ -70,7 +70,7 @@ public class SignalEntity implements Persistable<String> {
   public String getTradeEventId() { return tradeEventId; }
   public String getAgentId() { return agentId; }
   public String getInstrumentId() { return instrumentId; }
-  public String getIdempotencyKey() { return idempotencyKey; }
+  public String getClientEventId() { return clientEventId; }
   public String getSourceType() { return sourceType; }
   public String getSourceEventId() { return sourceEventId; }
   public String getOriginSourceType() { return originSourceType; }

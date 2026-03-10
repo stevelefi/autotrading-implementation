@@ -35,17 +35,17 @@ public class AgentRuntimeQaController {
   public Map<String, String> seed(@RequestBody Map<String, Object> req) {
     String signalId       = "qa-signal-" + UUID.randomUUID();
     String traceId        = str(req, "traceId", "qa-trace-" + UUID.randomUUID());
-    String idempotencyKey = str(req, "idempotencyKey", "qa-idem-" + UUID.randomUUID());
+    String clientEventId  = str(req, "clientEventId", "qa-cev-" + UUID.randomUUID());
     String agentId        = str(req, "agentId", "qa-agent");
     String instrumentId   = str(req, "instrumentId", "QA_INSTRUMENT");
     String tradeEventId   = str(req, "tradeEventId", "qa-trade-" + UUID.randomUUID());
 
     jdbc.update(
         "INSERT INTO signals "
-        + "(signal_id, trade_event_id, agent_id, instrument_id, idempotency_key, "
+        + "(signal_id, trade_event_id, agent_id, instrument_id, client_event_id, "
         + " source_type, source_event_id, origin_source_type, origin_source_event_id, "
         + " raw_payload_json, signal_ts) "
-        + "VALUES (:signalId, :tradeEventId, :agentId, :instrumentId, :idempotencyKey, "
+        + "VALUES (:signalId, :tradeEventId, :agentId, :instrumentId, :clientEventId, "
         + " 'AGENT_RUNTIME', NULL, 'QA', NULL, "
         + " :rawPayload, :now)",
         new MapSqlParameterSource()
@@ -53,25 +53,25 @@ public class AgentRuntimeQaController {
             .addValue("tradeEventId",   tradeEventId)
             .addValue("agentId",        agentId)
             .addValue("instrumentId",   instrumentId)
-            .addValue("idempotencyKey", idempotencyKey)
+            .addValue("clientEventId", clientEventId)
             .addValue("rawPayload",     "{\"qa\":true}")
             .addValue("now",            Timestamp.from(Instant.now())));
 
     return Map.of(
-        "signal_id",       signalId,
-        "trace_id",        traceId,
-        "idempotency_key", idempotencyKey,
-        "agent_id",        agentId);
+        "signal_id",        signalId,
+        "trace_id",         traceId,
+        "client_event_id",  clientEventId,
+        "agent_id",         agentId);
   }
 
   @GetMapping("/state")
   public List<Map<String, Object>> state(
       @RequestParam(required = false) String traceId,
-      @RequestParam(required = false) String idempotencyKey,
+      @RequestParam(required = false) String clientEventId,
       @RequestParam(required = false) String agentId) {
-    if (idempotencyKey != null) {
+    if (clientEventId != null) {
       return jdbc.queryForList(
-          "SELECT * FROM signals WHERE idempotency_key = :v", Map.of("v", idempotencyKey));
+          "SELECT * FROM signals WHERE client_event_id = :v", Map.of("v", clientEventId));
     }
     if (agentId != null) {
       return jdbc.queryForList(
@@ -91,7 +91,7 @@ public class AgentRuntimeQaController {
     }
     if (testRunPrefix != null) {
       deleted += jdbc.update(
-          "DELETE FROM signals WHERE idempotency_key LIKE :v",
+          "DELETE FROM signals WHERE client_event_id LIKE :v",
           Map.of("v", testRunPrefix + "%"));
     }
     return Map.of("deleted_rows", deleted);

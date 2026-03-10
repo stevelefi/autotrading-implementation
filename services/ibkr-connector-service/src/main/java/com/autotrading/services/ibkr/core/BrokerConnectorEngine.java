@@ -88,18 +88,9 @@ public class BrokerConnectorEngine {
 
     // Namespace the key so ibkr-connector does not collide with upstream services
     // (risk, order) that also claim the same idempotency key in the shared table.
-    String key = "ibkr:" + request.getRequestContext().getIdempotencyKey();
+    String key = "ibkr:" + request.getRequestContext().getClientEventId();
     String payloadHash = request.getOrderIntentId() + ":" + request.getQty() + ":" + request.getOrderType();
     ClaimResult claim = idempotencyService.claim(new IdempotencyClaim(key, payloadHash, Instant.now()));
-
-    if (claim.outcome() == ClaimOutcome.CONFLICT) {
-      return SubmitOrderResponse.newBuilder()
-          .setTraceId(request.getRequestContext().getTraceId())
-          .setStatus(CommandStatus.COMMAND_STATUS_REJECTED)
-          .setBrokerSubmitId("")
-          .setSubmittedAt(Instant.now().toString())
-          .build();
-    }
 
     if (claim.outcome() == ClaimOutcome.REPLAY) {
       SubmitOrderResponse replay = submitReplay.get(key);

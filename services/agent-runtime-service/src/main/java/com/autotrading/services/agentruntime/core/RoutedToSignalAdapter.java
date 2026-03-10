@@ -14,7 +14,7 @@ public class RoutedToSignalAdapter {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId(input.traceId())
             .setRequestId(input.requestId())
-            .setIdempotencyKey(input.idempotencyKey())
+            .setClientEventId(input.clientEventId())
             .setPrincipalId(input.principalId())
             .build())
         .setAgentId(input.agentId())
@@ -37,7 +37,7 @@ public class RoutedToSignalAdapter {
   public record RoutedSignalInput(
       String traceId,
       String requestId,
-      String idempotencyKey,
+      String clientEventId,
       String principalId,
       String agentId,
       String signalId,

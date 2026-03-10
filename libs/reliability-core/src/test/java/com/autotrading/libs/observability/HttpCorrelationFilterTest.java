@@ -11,7 +11,7 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-import static com.autotrading.libs.observability.HttpCorrelationFilter.MDC_IDEMPOTENCY_KEY;
+import static com.autotrading.libs.observability.HttpCorrelationFilter.MDC_CLIENT_EVENT_ID;
 import static com.autotrading.libs.observability.HttpCorrelationFilter.MDC_PRINCIPAL_ID;
 import static com.autotrading.libs.observability.HttpCorrelationFilter.MDC_REQUEST_ID;
 import static com.autotrading.libs.observability.HttpCorrelationFilter.MDC_TRACE_ID;
@@ -45,7 +45,7 @@ class HttpCorrelationFilterTest {
         var request = new MockHttpServletRequest();
         request.addHeader("X-Trace-Id",        "tid-1");
         request.addHeader("X-Request-Id",      "rid-1");
-        request.addHeader("X-Idempotency-Key", "idem-1");
+        request.addHeader("X-Client-Event-Id", "idem-1");
         request.addHeader("X-Principal-Id",    "pid-1");
 
         var capturedMdc = new String[4];
@@ -53,7 +53,7 @@ class HttpCorrelationFilterTest {
         filter.doFilterInternal(request, new MockHttpServletResponse(), (req, res) -> {
             capturedMdc[0] = MDC.get(MDC_TRACE_ID);
             capturedMdc[1] = MDC.get(MDC_REQUEST_ID);
-            capturedMdc[2] = MDC.get(MDC_IDEMPOTENCY_KEY);
+            capturedMdc[2] = MDC.get(MDC_CLIENT_EVENT_ID);
             capturedMdc[3] = MDC.get(MDC_PRINCIPAL_ID);
         });
 
@@ -68,7 +68,7 @@ class HttpCorrelationFilterTest {
         // Guard against regression — constants must use snake_case not camelCase
         assertThat(MDC_TRACE_ID).isEqualTo("trace_id");
         assertThat(MDC_REQUEST_ID).isEqualTo("request_id");
-        assertThat(MDC_IDEMPOTENCY_KEY).isEqualTo("idempotency_key");
+        assertThat(MDC_CLIENT_EVENT_ID).isEqualTo("client_event_id");
         assertThat(MDC_PRINCIPAL_ID).isEqualTo("principal_id");
     }
 
@@ -86,7 +86,7 @@ class HttpCorrelationFilterTest {
         filter.doFilterInternal(request, response, (req, res) -> {
             capturedMdc[0] = MDC.get(MDC_TRACE_ID);
             capturedMdc[1] = MDC.get(MDC_REQUEST_ID);
-            capturedMdc[2] = MDC.get(MDC_IDEMPOTENCY_KEY);
+            capturedMdc[2] = MDC.get(MDC_CLIENT_EVENT_ID);
             capturedMdc[3] = MDC.get(MDC_PRINCIPAL_ID);
         });
 
@@ -106,14 +106,14 @@ class HttpCorrelationFilterTest {
         var request = new MockHttpServletRequest();
         request.addHeader("X-Trace-Id",        "tid-cleanup");
         request.addHeader("X-Request-Id",      "rid-cleanup");
-        request.addHeader("X-Idempotency-Key", "idem-cleanup");
+        request.addHeader("X-Client-Event-Id", "idem-cleanup");
         request.addHeader("X-Principal-Id",    "pid-cleanup");
 
         filter.doFilterInternal(request, new MockHttpServletResponse(), new MockFilterChain());
 
         assertThat(MDC.get(MDC_TRACE_ID)).isNull();
         assertThat(MDC.get(MDC_REQUEST_ID)).isNull();
-        assertThat(MDC.get(MDC_IDEMPOTENCY_KEY)).isNull();
+        assertThat(MDC.get(MDC_CLIENT_EVENT_ID)).isNull();
         assertThat(MDC.get(MDC_PRINCIPAL_ID)).isNull();
     }
 

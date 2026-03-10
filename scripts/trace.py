@@ -82,8 +82,8 @@ def _build_logql(args: argparse.Namespace) -> str:
 
     # Line filters (|= "key=value") — for MDC fields embedded in log line text
     filters: list[str] = []
-    if args.idempotency_key:
-        filters.append(f"idempotency_key={args.idempotency_key}")
+    if args.client_event_id:
+        filters.append(f"client_event_id={args.client_event_id}")
     if args.agent_id:
         filters.append(f"agent_id={args.agent_id}")
     if args.order_intent_id:
@@ -200,7 +200,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # Filter flags
     p.add_argument("--trace-id", metavar="ID", help="Filter by trace_id MDC field")
-    p.add_argument("--idempotency-key", metavar="KEY", help="Filter by idempotency_key MDC field")
+    p.add_argument("--client-event-id", metavar="KEY", help="Filter by client_event_id MDC field")
     p.add_argument("--agent-id", metavar="ID", help="Filter by agent_id MDC field")
     p.add_argument("--order-intent-id", metavar="ID", help="Filter by order_intent_id MDC field")
     p.add_argument("--signal-id", metavar="ID", help="Filter by signal_id MDC field")

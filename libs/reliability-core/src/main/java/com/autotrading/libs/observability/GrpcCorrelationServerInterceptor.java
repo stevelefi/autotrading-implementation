@@ -30,14 +30,14 @@ public class GrpcCorrelationServerInterceptor implements ServerInterceptor {
       Metadata.Key.of("x-trace-id", Metadata.ASCII_STRING_MARSHALLER);
   static final Metadata.Key<String> REQUEST_ID_KEY =
       Metadata.Key.of("x-request-id", Metadata.ASCII_STRING_MARSHALLER);
-  static final Metadata.Key<String> IDEMPOTENCY_KEY_KEY =
-      Metadata.Key.of("x-idempotency-key", Metadata.ASCII_STRING_MARSHALLER);
+  static final Metadata.Key<String> CLIENT_EVENT_ID_KEY =
+      Metadata.Key.of("x-client-event-id", Metadata.ASCII_STRING_MARSHALLER);
   static final Metadata.Key<String> PRINCIPAL_ID_KEY =
       Metadata.Key.of("x-principal-id", Metadata.ASCII_STRING_MARSHALLER);
 
   static final String MDC_TRACE_ID        = "trace_id";
   static final String MDC_REQUEST_ID      = "request_id";
-  static final String MDC_IDEMPOTENCY_KEY = "idempotency_key";
+  static final String MDC_CLIENT_EVENT_ID = "client_event_id";
   static final String MDC_PRINCIPAL_ID    = "principal_id";
 
   @Override
@@ -48,13 +48,13 @@ public class GrpcCorrelationServerInterceptor implements ServerInterceptor {
 
     String traceId        = resolveHeader(headers, TRACE_ID_KEY);
     String requestId      = resolveHeader(headers, REQUEST_ID_KEY);
-    String idempotencyKey = resolveHeader(headers, IDEMPOTENCY_KEY_KEY);
+    String clientEventId = resolveHeader(headers, CLIENT_EVENT_ID_KEY);
     String principalId    = resolveHeader(headers, PRINCIPAL_ID_KEY);
 
     log.debug("gRPC call {} trace_id={} request_id={}",
         call.getMethodDescriptor().getFullMethodName(), traceId, requestId);
 
-    return new CorrelatedListener<>(next.startCall(call, headers), traceId, requestId, idempotencyKey, principalId);
+    return new CorrelatedListener<>(next.startCall(call, headers), traceId, requestId, clientEventId, principalId);
   }
 
   // -----------------------------------------------------------------------
@@ -71,16 +71,16 @@ public class GrpcCorrelationServerInterceptor implements ServerInterceptor {
     private final ServerCall.Listener<ReqT> delegate;
     private final String traceId;
     private final String requestId;
-    private final String idempotencyKey;
+    private final String clientEventId;
     private final String principalId;
 
     CorrelatedListener(ServerCall.Listener<ReqT> delegate,
                        String traceId, String requestId,
-                       String idempotencyKey, String principalId) {
+                       String clientEventId, String principalId) {
       this.delegate       = delegate;
       this.traceId        = traceId;
       this.requestId      = requestId;
-      this.idempotencyKey = idempotencyKey;
+      this.clientEventId  = clientEventId;
       this.principalId    = principalId;
     }
 
@@ -93,14 +93,14 @@ public class GrpcCorrelationServerInterceptor implements ServerInterceptor {
     private void withMdc(Runnable action) {
       MDC.put(MDC_TRACE_ID,        traceId);
       MDC.put(MDC_REQUEST_ID,      requestId);
-      MDC.put(MDC_IDEMPOTENCY_KEY, idempotencyKey);
+      MDC.put(MDC_CLIENT_EVENT_ID, clientEventId);
       MDC.put(MDC_PRINCIPAL_ID,    principalId);
       try {
         action.run();
       } finally {
         MDC.remove(MDC_TRACE_ID);
         MDC.remove(MDC_REQUEST_ID);
-        MDC.remove(MDC_IDEMPOTENCY_KEY);
+        MDC.remove(MDC_CLIENT_EVENT_ID);
         MDC.remove(MDC_PRINCIPAL_ID);
       }
     }
