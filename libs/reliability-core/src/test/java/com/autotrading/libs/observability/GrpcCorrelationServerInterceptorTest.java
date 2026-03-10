@@ -8,8 +8,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
-import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.IDEMPOTENCY_KEY_KEY;
-import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.MDC_IDEMPOTENCY_KEY;
+import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.CLIENT_EVENT_ID_KEY;
+import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.MDC_CLIENT_EVENT_ID;
 import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.MDC_PRINCIPAL_ID;
 import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.MDC_REQUEST_ID;
 import static com.autotrading.libs.observability.GrpcCorrelationServerInterceptor.MDC_TRACE_ID;
@@ -75,7 +75,7 @@ class GrpcCorrelationServerInterceptorTest {
             private void doCapture() {
                 out[0] = MDC.get(MDC_TRACE_ID);
                 out[1] = MDC.get(MDC_REQUEST_ID);
-                out[2] = MDC.get(MDC_IDEMPOTENCY_KEY);
+                out[2] = MDC.get(MDC_CLIENT_EVENT_ID);
                 out[3] = MDC.get(MDC_PRINCIPAL_ID);
             }
         };
@@ -90,7 +90,7 @@ class GrpcCorrelationServerInterceptorTest {
         Metadata headers = new Metadata();
         headers.put(TRACE_ID_KEY,        "t-1");
         headers.put(REQUEST_ID_KEY,      "r-1");
-        headers.put(IDEMPOTENCY_KEY_KEY, "i-1");
+        headers.put(CLIENT_EVENT_ID_KEY, "i-1");
         headers.put(PRINCIPAL_ID_KEY,    "p-1");
 
         String[] captured = new String[4];
@@ -109,7 +109,7 @@ class GrpcCorrelationServerInterceptorTest {
         Metadata headers = new Metadata();
         headers.put(TRACE_ID_KEY,        "t-msg");
         headers.put(REQUEST_ID_KEY,      "r-msg");
-        headers.put(IDEMPOTENCY_KEY_KEY, "i-msg");
+        headers.put(CLIENT_EVENT_ID_KEY, "i-msg");
         headers.put(PRINCIPAL_ID_KEY,    "p-msg");
 
         String[] captured = new String[4];
@@ -126,7 +126,7 @@ class GrpcCorrelationServerInterceptorTest {
         Metadata headers = new Metadata();
         headers.put(TRACE_ID_KEY, "t-ev");
         headers.put(REQUEST_ID_KEY, "r-ev");
-        headers.put(IDEMPOTENCY_KEY_KEY, "i-ev");
+        headers.put(CLIENT_EVENT_ID_KEY, "i-ev");
         headers.put(PRINCIPAL_ID_KEY, "p-ev");
 
         String[] cancelCapture  = new String[4];
@@ -135,13 +135,13 @@ class GrpcCorrelationServerInterceptorTest {
             @Override public void onCancel() {
                 cancelCapture[0]  = MDC.get(MDC_TRACE_ID);
                 cancelCapture[1]  = MDC.get(MDC_REQUEST_ID);
-                cancelCapture[2]  = MDC.get(MDC_IDEMPOTENCY_KEY);
+                cancelCapture[2]  = MDC.get(MDC_CLIENT_EVENT_ID);
                 cancelCapture[3]  = MDC.get(MDC_PRINCIPAL_ID);
             }
             @Override public void onComplete() {
                 completeCapture[0] = MDC.get(MDC_TRACE_ID);
                 completeCapture[1] = MDC.get(MDC_REQUEST_ID);
-                completeCapture[2] = MDC.get(MDC_IDEMPOTENCY_KEY);
+                completeCapture[2] = MDC.get(MDC_CLIENT_EVENT_ID);
                 completeCapture[3] = MDC.get(MDC_PRINCIPAL_ID);
             }
             @Override public void onReady() {}
@@ -184,7 +184,7 @@ class GrpcCorrelationServerInterceptorTest {
         Metadata headers = new Metadata();
         headers.put(TRACE_ID_KEY, "t-clear");
         headers.put(REQUEST_ID_KEY, "r-clear");
-        headers.put(IDEMPOTENCY_KEY_KEY, "i-clear");
+        headers.put(CLIENT_EVENT_ID_KEY, "i-clear");
         headers.put(PRINCIPAL_ID_KEY, "p-clear");
 
         ServerCall.Listener<byte[]> listener =
@@ -193,7 +193,7 @@ class GrpcCorrelationServerInterceptorTest {
 
         assertThat(MDC.get(MDC_TRACE_ID)).isNull();
         assertThat(MDC.get(MDC_REQUEST_ID)).isNull();
-        assertThat(MDC.get(MDC_IDEMPOTENCY_KEY)).isNull();
+        assertThat(MDC.get(MDC_CLIENT_EVENT_ID)).isNull();
         assertThat(MDC.get(MDC_PRINCIPAL_ID)).isNull();
     }
 
@@ -205,7 +205,7 @@ class GrpcCorrelationServerInterceptorTest {
     void mdcKeyNamesUseSnakeCase() {
         assertThat(MDC_TRACE_ID).isEqualTo("trace_id");
         assertThat(MDC_REQUEST_ID).isEqualTo("request_id");
-        assertThat(MDC_IDEMPOTENCY_KEY).isEqualTo("idempotency_key");
+        assertThat(MDC_CLIENT_EVENT_ID).isEqualTo("client_event_id");
         assertThat(MDC_PRINCIPAL_ID).isEqualTo("principal_id");
     }
 

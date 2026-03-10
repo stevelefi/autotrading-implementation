@@ -23,11 +23,8 @@ public class InMemoryIdempotencyService implements IdempotencyService {
       return new ClaimResult(ClaimOutcome.CLAIMED, created, "claimed");
     }
 
-    if (!existing.payloadHash().equals(claim.payloadHash())) {
-      return new ClaimResult(ClaimOutcome.CONFLICT, existing, "same key with different payload");
-    }
-
-    return new ClaimResult(ClaimOutcome.REPLAY, existing, "replay existing operation");
+    // First-write-wins: same key with any payload always replays the original response.
+    return new ClaimResult(ClaimOutcome.REPLAY, existing, "first-write-wins: return original response");
   }
 
   @Override

@@ -17,7 +17,7 @@ class SimplePolicyEngineTest {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-1")
             .setRequestId("req-1")
-            .setIdempotencyKey("id-1")
+            .setClientEventId("id-1")
             .setPrincipalId("svc-agent")
             .build())
         .setReason("OPA_TIMEOUT")

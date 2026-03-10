@@ -75,12 +75,12 @@ class RiskDecisionGrpcServiceTest {
         };
     }
 
-    private static EvaluateSignalRequest fullRequest(String idempotencyKey) {
+    private static EvaluateSignalRequest fullRequest(String clientEventId) {
         return EvaluateSignalRequest.newBuilder()
                 .setRequestContext(RequestContext.newBuilder()
                         .setTraceId("trc-1")
                         .setRequestId("req-1")
-                        .setIdempotencyKey(idempotencyKey)
+                        .setClientEventId(clientEventId)
                         .setPrincipalId("svc-agent")
                         .build())
                 .setAgentId("agent-1")

@@ -26,10 +26,9 @@ public class IngressController {
       @RequestBody IngressSubmitRequest request) {
     if (request.agent_id() != null) MDC.put("agent_id", request.agent_id());
     IngressAcceptedResponse response = ingressService.accept(request, requestId, authorization);
-    // Populate MDC with the unified trace_id (snake_case) used by all downstream
-    // consumers and scripts/trace.py — matches the OTel trace ID stored in the DB
-    // and propagated through every Kafka envelope.
-    MDC.put("trace_id", response.trace_id());
+    // Populate MDC with the unified event_id (= OTel trace ID) used by all downstream
+    // consumers and scripts/trace.py — stored in the DB and every Kafka envelope.
+    MDC.put("event_id", response.event_id());
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
   }
 }

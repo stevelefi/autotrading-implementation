@@ -107,7 +107,7 @@ class VerticalSliceGrpcFlowTest {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-e2e")
             .setRequestId("req-e2e")
-            .setIdempotencyKey("idem-e2e")
+            .setClientEventId("idem-e2e")
             .setPrincipalId("svc-agent-runtime")
             .build())
         .setAgentId("agent-momo-01")

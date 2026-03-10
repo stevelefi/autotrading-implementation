@@ -1,6 +1,5 @@
 package com.autotrading.services.monitoring.core;
 
-import com.autotrading.libs.idempotency.ClaimOutcome;
 import com.autotrading.libs.idempotency.IdempotencyClaim;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import java.time.Instant;
@@ -15,21 +14,17 @@ public class InMemoryIngressForwarder implements IngressForwarder {
   private final Map<String, String> ingressEventByKey = new ConcurrentHashMap<>();
 
   @Override
-  public Map<String, Object> forward(String idempotencyKey, Map<String, Object> payload, String sourceType) {
+  public Map<String, Object> forward(String clientEventId, Map<String, Object> payload, String sourceType) {
     String payloadHash = sourceType + ":" + payload.hashCode();
-    var claim = idempotency.claim(new IdempotencyClaim(idempotencyKey, payloadHash, Instant.now()));
+    var claim = idempotency.claim(new IdempotencyClaim(clientEventId, payloadHash, Instant.now()));
 
-    if (claim.outcome() == ClaimOutcome.CONFLICT) {
-      throw new IllegalArgumentException("idempotency conflict");
-    }
-
-    String ingressEventId = ingressEventByKey.computeIfAbsent(idempotencyKey, ignored -> "ing-" + UUID.randomUUID());
-    idempotency.markCompleted(idempotencyKey, ingressEventId);
+    String eventId = ingressEventByKey.computeIfAbsent(clientEventId, ignored -> UUID.randomUUID().toString());
+    idempotency.markCompleted(clientEventId, eventId);
 
     return Map.of(
         "accepted", true,
-        "ingress_event_id", ingressEventId,
+        "event_id", eventId,
         "received_at", Instant.now().toString(),
-        "status", claim.outcome() == ClaimOutcome.REPLAY ? "ACCEPTED" : "ACCEPTED");
+        "status", "ACCEPTED");
   }
 }

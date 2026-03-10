@@ -108,7 +108,7 @@ class OrderSmokeControllerTest {
     @Test
     void timeoutDrillCreatesOrderAndTriggersTimeout() {
         Map<String, Object> result = controller.timeoutDrill(
-                Map.of("idempotency_key", "idem-smoke-drill"));
+                Map.of("client_event_id", "idem-smoke-drill"));
 
         assertThat(result.get("timeouts_triggered")).isEqualTo(1);
         assertThat(result.get("create_status")).isEqualTo("COMMAND_STATUS_ACCEPTED");
@@ -127,7 +127,7 @@ class OrderSmokeControllerTest {
                 .setRequestContext(RequestContext.newBuilder()
                         .setTraceId("trc-1")
                         .setRequestId("req-1")
-                        .setIdempotencyKey(idem)
+                        .setClientEventId(idem)
                         .setPrincipalId("svc-risk")
                         .build())
                 .setAgentId("agent-1")

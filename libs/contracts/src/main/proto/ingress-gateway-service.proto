@@ -11,7 +11,7 @@ service IngressService {
 
 message PublishEventRequest {
   string request_id = 1;
-  string idempotency_key = 2;
+  string client_event_id = 2;
   string event_intent = 3;
   string agent_id = 4;
   string integration_id = 5;
@@ -21,9 +21,8 @@ message PublishEventRequest {
 }
 
 message AcceptedResponse {
-  string trace_id = 1;
+  string event_id = 1;
   bool accepted = 2;
-  string ingress_event_id = 3;
-  string received_at = 4;
-  string status = 5;
+  string received_at = 3;
+  string status = 4;
 }

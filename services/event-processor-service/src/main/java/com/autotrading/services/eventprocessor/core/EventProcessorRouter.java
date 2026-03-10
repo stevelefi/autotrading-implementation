@@ -21,10 +21,10 @@ public class EventProcessorRouter {
 
     return Optional.of(new RoutedTradeEvent(
         "trade-" + UUID.randomUUID(),
-        normalized.ingressEventId(),
+        normalized.eventId(),
         normalized.rawEventId(),
         normalized.traceId(),
-        normalized.idempotencyKey(),
+        normalized.clientEventId(),
         normalized.sourceType(),
         normalized.sourceEventId(),
         normalized.agentId(),

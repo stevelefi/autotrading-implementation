@@ -5,7 +5,7 @@ import org.springframework.data.repository.ListCrudRepository;
 
 public interface IngressRawEventRepository extends ListCrudRepository<IngressRawEventEntity, String> {
 
-  Optional<IngressRawEventEntity> findByIdempotencyKey(String idempotencyKey);
+  Optional<IngressRawEventEntity> findByClientEventId(String clientEventId);
 
-  boolean existsByIdempotencyKey(String idempotencyKey);
+  boolean existsByClientEventId(String clientEventId);
 }

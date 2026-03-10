@@ -17,14 +17,14 @@ public class RoutedTradeEventEntity implements Persistable<String> {
   @Column("raw_event_id")
   private String rawEventId;
 
-  @Column("ingress_event_id")
-  private String ingressEventId;
+  @Column("event_id")
+  private String eventId;
 
   @Column("trace_id")
   private String traceId;
 
-  @Column("idempotency_key")
-  private String idempotencyKey;
+  @Column("client_event_id")
+  private String clientEventId;
 
   @Column("agent_id")
   private String agentId;
@@ -60,9 +60,9 @@ public class RoutedTradeEventEntity implements Persistable<String> {
   public RoutedTradeEventEntity(
       String tradeEventId,
       String rawEventId,
-      String ingressEventId,
+      String eventId,
       String traceId,
-      String idempotencyKey,
+      String clientEventId,
       String agentId,
       String sourceType,
       String sourceEventId,
@@ -74,9 +74,9 @@ public class RoutedTradeEventEntity implements Persistable<String> {
       Instant routedAt) {
     this.tradeEventId = tradeEventId;
     this.rawEventId = rawEventId;
-    this.ingressEventId = ingressEventId;
+    this.eventId = eventId;
     this.traceId = traceId;
-    this.idempotencyKey = idempotencyKey;
+    this.clientEventId = clientEventId;
     this.agentId = agentId;
     this.sourceType = sourceType;
     this.sourceEventId = sourceEventId;
@@ -91,9 +91,9 @@ public class RoutedTradeEventEntity implements Persistable<String> {
 
   public String getTradeEventId() { return tradeEventId; }
   public String getRawEventId() { return rawEventId; }
-  public String getIngressEventId() { return ingressEventId; }
+  public String getEventId() { return eventId; }
   public String getTraceId() { return traceId; }
-  public String getIdempotencyKey() { return idempotencyKey; }
+  public String getClientEventId() { return clientEventId; }
   public String getAgentId() { return agentId; }
   public String getSourceType() { return sourceType; }
   public String getSourceEventId() { return sourceEventId; }

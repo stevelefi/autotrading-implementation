@@ -47,15 +47,15 @@ public class OrderSmokeController {
 
   @PostMapping("/timeout-drill")
   public Map<String, Object> timeoutDrill(@RequestBody(required = false) Map<String, Object> payload) {
-    String idempotencyKey = payload == null || payload.get("idempotency_key") == null
+    String clientEventId = payload == null || payload.get("client_event_id") == null
         ? "smoke-timeout-" + UUID.randomUUID()
-        : String.valueOf(payload.get("idempotency_key"));
+        : String.valueOf(payload.get("client_event_id"));
 
     CreateOrderIntentRequest request = CreateOrderIntentRequest.newBuilder()
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-" + UUID.randomUUID())
             .setRequestId("req-" + UUID.randomUUID())
-            .setIdempotencyKey(idempotencyKey)
+            .setClientEventId(clientEventId)
             .setPrincipalId("smoke-order")
             .build())
         .setAgentId("agent-smoke")

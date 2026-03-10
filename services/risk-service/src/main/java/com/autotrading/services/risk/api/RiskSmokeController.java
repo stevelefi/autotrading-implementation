@@ -39,9 +39,9 @@ public class RiskSmokeController {
 
   @PostMapping("/command-path")
   public Map<String, Object> commandPath(@RequestBody(required = false) Map<String, Object> payload) {
-    String idempotencyKey = payload == null || payload.get("idempotency_key") == null
+    String clientEventId = payload == null || payload.get("client_event_id") == null
         ? "smoke-command-" + UUID.randomUUID()
-        : String.valueOf(payload.get("idempotency_key"));
+        : String.valueOf(payload.get("client_event_id"));
     String signalId = payload == null || payload.get("signal_id") == null
         ? "sig-" + UUID.randomUUID()
         : String.valueOf(payload.get("signal_id"));
@@ -56,7 +56,7 @@ public class RiskSmokeController {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-" + UUID.randomUUID())
             .setRequestId("req-" + UUID.randomUUID())
-            .setIdempotencyKey(idempotencyKey)
+            .setClientEventId(clientEventId)
             .setPrincipalId("smoke-risk")
             .build())
         .setAgentId("agent-smoke")

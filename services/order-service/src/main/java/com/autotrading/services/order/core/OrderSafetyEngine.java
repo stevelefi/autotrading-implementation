@@ -83,19 +83,11 @@ public class OrderSafetyEngine {
     }
 
     // Namespace the key so order-service does not collide with risk-service
-    // (or any other upstream service) that also claims the same idempotency key
+    // (or any other upstream service) that also claims the same client_event_id
     // against the shared idempotency_records table.
-    String key = "order:" + request.getRequestContext().getIdempotencyKey();
+    String key = "order:" + request.getRequestContext().getClientEventId();
     String payloadHash = request.getAgentId() + ":" + request.getSignalId() + ":" + request.getQty();
     ClaimResult claim = idempotencyService.claim(new IdempotencyClaim(key, payloadHash, Instant.now(clock)));
-
-    if (claim.outcome() == ClaimOutcome.CONFLICT) {
-      return CreateOrderIntentResponse.newBuilder()
-          .setTraceId(request.getRequestContext().getTraceId())
-          .setStatus(CommandStatus.COMMAND_STATUS_REJECTED)
-          .addReasons("idempotency conflict")
-          .build();
-    }
 
     if (claim.outcome() == ClaimOutcome.REPLAY) {
       String existingOrderIntentId = orderIdByKey.get(key);

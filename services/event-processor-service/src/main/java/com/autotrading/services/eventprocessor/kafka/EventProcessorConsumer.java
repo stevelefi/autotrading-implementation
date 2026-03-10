@@ -78,15 +78,15 @@ public class EventProcessorConsumer {
   private void processRecord(ConsumerRecord<String, String> record) throws Exception {
     JsonNode root = objectMapper.readTree(record.value());
 
-    String ingressEventId = root.path("eventId").asText();
+    String eventId = root.path("eventId").asText();
     String traceId = root.at("/context/traceId").asText("");
-    String idempotencyKey = root.at("/context/idempotencyKey").asText("");
+    String clientEventId = root.at("/context/clientEventId").asText("");
     String agentId = root.path("agentId").asText(null);
 
     // Set MDC for structured logging
-    MDC.put("trace_id", traceId);
-    MDC.put("idempotency_key", idempotencyKey);
-    MDC.put("request_id", ingressEventId);
+    MDC.put("event_id", eventId);
+    MDC.put("client_event_id", clientEventId);
+    MDC.put("request_id", eventId);
     if (agentId != null) MDC.put("agent_id", agentId);
     Instant occurredAt;
     try {
@@ -96,7 +96,7 @@ public class EventProcessorConsumer {
     }
 
     JsonNode payloadNode = root.path("payload");
-    String rawEventId = payloadNode.path("rawEventId").asText(ingressEventId);
+    String rawEventId = payloadNode.path("rawEventId").asText(eventId);
     String sourceType = payloadNode.path("sourceType").asText("HTTP");
     String sourceEventId = payloadNode.path("sourceEventId").asText(null);
     String eventIntent = payloadNode.path("eventIntent").asText("");
@@ -113,15 +113,15 @@ public class EventProcessorConsumer {
     AtomicReference<String> pendingEnvelopeJson = new AtomicReference<>();
     AtomicReference<String> pendingPartitionKey = new AtomicReference<>();
 
-    boolean processed = consumerDeduper.runOnce(CONSUMER_NAME, ingressEventId, () -> {
+    boolean processed = consumerDeduper.runOnce(CONSUMER_NAME, eventId, () -> {
       try {
         NormalizedIngressEvent normalized = new NormalizedIngressEvent(
-            ingressEventId, rawEventId, traceId, idempotencyKey,
+            eventId, rawEventId, traceId, clientEventId,
             sourceType, finalSourceEventId, finalAgentId, eventIntent, finalOccurredAt, userPayload);
 
         Optional<RoutedTradeEvent> routed = router.route(normalized);
         if (routed.isEmpty()) {
-          log.debug("event-processor skipped ingressEventId={} (no route)", ingressEventId);
+          log.debug("event-processor skipped eventId={} (no route)", eventId);
           return;
         }
 
@@ -129,8 +129,8 @@ public class EventProcessorConsumer {
         String payloadJson = objectMapper.writeValueAsString(rte.payload());
 
         RoutedTradeEventEntity entity = new RoutedTradeEventEntity(
-            rte.tradeEventId(), rte.rawEventId(), rte.ingressEventId(),
-            rte.traceId(), rte.idempotencyKey(), rte.agentId(),
+            rte.tradeEventId(), rte.rawEventId(), rte.eventId(),
+            rte.traceId(), rte.clientEventId(), rte.agentId(),
             rte.sourceType(), rte.sourceEventId(), payloadJson,
             null, OUT_TOPIC, "ROUTED",
             finalOccurredAt, rte.routedAt());
@@ -139,9 +139,9 @@ public class EventProcessorConsumer {
 
         Map<String, Object> envelope = Map.of(
             "tradeEventId", rte.tradeEventId(),
-            "ingressEventId", ingressEventId,
+            "eventId", eventId,
             "traceId", traceId,
-            "idempotencyKey", idempotencyKey,
+            "clientEventId", clientEventId,
             "agentId", finalAgentId != null ? finalAgentId : "",
             "sourceType", sourceType,
             "sourceEventId", finalSourceEventId != null ? finalSourceEventId : "",
@@ -152,18 +152,18 @@ public class EventProcessorConsumer {
         pendingEnvelopeJson.set(envelopeJson);
         pendingPartitionKey.set(finalAgentId);
 
-        log.info("event-processor routed tradeEventId={} ingressEventId={} agentId={}",
-            rte.tradeEventId(), ingressEventId, finalAgentId);
+        log.info("event-processor routed tradeEventId={} eventId={} agentId={}",
+            rte.tradeEventId(), eventId, finalAgentId);
       } catch (RuntimeException re) {
         throw re;
       } catch (Exception e) {
         throw new RuntimeException(
-            "routing failed for ingressEventId=" + ingressEventId, e);
+            "routing failed for eventId=" + eventId, e);
       }
     });
 
     if (!processed) {
-      log.debug("event-processor duplicate suppressed ingressEventId={}", ingressEventId);
+      log.debug("event-processor duplicate suppressed eventId={}", eventId);
       return;
     }
 

@@ -65,16 +65,16 @@ public class AgentRuntimeConsumer {
     JsonNode root = objectMapper.readTree(record.value());
 
     String tradeEventId = root.path("tradeEventId").asText();
-    String ingressEventId = root.path("ingressEventId").asText(tradeEventId);
+    String eventId = root.path("eventId").asText(tradeEventId);
     String traceId = root.path("traceId").asText("");
-    String idempotencyKey = root.path("idempotencyKey").asText("");
+    String clientEventId = root.path("clientEventId").asText("");
     String agentId = root.path("agentId").asText(null);
     String sourceType = root.path("sourceType").asText("HTTP");
     String sourceEventId = root.path("sourceEventId").asText(null);
 
     // Set MDC for structured logging
-    MDC.put("trace_id", traceId);
-    MDC.put("idempotency_key", idempotencyKey);
+    MDC.put("event_id", eventId);
+    MDC.put("client_event_id", clientEventId);
     MDC.put("request_id", tradeEventId);
     if (agentId != null) MDC.put("agent_id", agentId);
 
@@ -101,7 +101,7 @@ public class AgentRuntimeConsumer {
         RoutedToSignalAdapter.RoutedSignalInput input = new RoutedToSignalAdapter.RoutedSignalInput(
             traceId,
             UUID.randomUUID().toString(),
-            idempotencyKey + ":risk",
+            clientEventId + ":risk",
             agentId != null ? agentId : "anonymous",
             agentId != null ? agentId : "anonymous",
             signalId,
@@ -123,9 +123,9 @@ public class AgentRuntimeConsumer {
             signalId, tradeEventId,
             agentId != null ? agentId : "anonymous",
             instrumentId,
-            idempotencyKey,
+            clientEventId,
             "AGENT_RUNTIME",
-            ingressEventId,
+            eventId,
             sourceType,
             finalSourceEventId != null ? finalSourceEventId : "",
             rawPayloadJson,

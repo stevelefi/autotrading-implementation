@@ -20,7 +20,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * <ul>
  *   <li>{@code X-Trace-Id}        → MDC key {@code trace_id}</li>
  *   <li>{@code X-Request-Id}      → MDC key {@code request_id}</li>
- *   <li>{@code X-Idempotency-Key} → MDC key {@code idempotency_key}</li>
+ *   <li>{@code X-Client-Event-Id} → MDC key {@code client_event_id}</li>
  *   <li>{@code X-Principal-Id}    → MDC key {@code principal_id}</li>
  * </ul>
  *
@@ -33,7 +33,7 @@ public class HttpCorrelationFilter extends OncePerRequestFilter {
 
   static final String MDC_TRACE_ID        = "trace_id";
   static final String MDC_REQUEST_ID      = "request_id";
-  static final String MDC_IDEMPOTENCY_KEY = "idempotency_key";
+  static final String MDC_CLIENT_EVENT_ID = "client_event_id";
   static final String MDC_PRINCIPAL_ID    = "principal_id";
 
   @Override
@@ -42,14 +42,14 @@ public class HttpCorrelationFilter extends OncePerRequestFilter {
                                   FilterChain filterChain)
       throws ServletException, IOException {
 
-    String traceId        = resolve(request, "X-Trace-Id");
-    String requestId      = resolve(request, "X-Request-Id");
-    String idempotencyKey = resolve(request, "X-Idempotency-Key");
-    String principalId    = resolve(request, "X-Principal-Id");
+    String traceId       = resolve(request, "X-Trace-Id");
+    String requestId     = resolve(request, "X-Request-Id");
+    String clientEventId = resolve(request, "X-Client-Event-Id");
+    String principalId   = resolve(request, "X-Principal-Id");
 
     MDC.put(MDC_TRACE_ID,        traceId);
     MDC.put(MDC_REQUEST_ID,      requestId);
-    MDC.put(MDC_IDEMPOTENCY_KEY, idempotencyKey);
+    MDC.put(MDC_CLIENT_EVENT_ID, clientEventId);
     MDC.put(MDC_PRINCIPAL_ID,    principalId);
 
     // Echo the resolved trace-id back so callers can correlate responses.
@@ -60,7 +60,7 @@ public class HttpCorrelationFilter extends OncePerRequestFilter {
     } finally {
       MDC.remove(MDC_TRACE_ID);
       MDC.remove(MDC_REQUEST_ID);
-      MDC.remove(MDC_IDEMPOTENCY_KEY);
+      MDC.remove(MDC_CLIENT_EVENT_ID);
       MDC.remove(MDC_PRINCIPAL_ID);
     }
   }

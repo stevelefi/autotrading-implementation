@@ -3,10 +3,9 @@ package com.autotrading.services.ingress.core;
 import java.time.Instant;
 
 public record IngressEventRecord(
-    String idempotencyKey,
+    String clientEventId,
     String payloadHash,
-    String ingressEventId,
-    String traceId,
+    String eventId,
     Instant receivedAt,
     String status
 ) {

@@ -77,25 +77,20 @@ public class IngressService {
 
     String payloadHash = hashPayload(request);
     ClaimResult claim = idempotencyService.claim(
-        new IdempotencyClaim(request.idempotency_key(), payloadHash, Instant.now()));
-
-    if (claim.outcome() == ClaimOutcome.CONFLICT) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "idempotency conflict");
-    }
+        new IdempotencyClaim(request.client_event_id(), payloadHash, Instant.now()));
 
     if (claim.outcome() == ClaimOutcome.REPLAY) {
-      return rawEventRepository.findByIdempotencyKey(request.idempotency_key())
-          .map(e -> toResponse(e.getIngressEventId(), e.getTraceId(), e.getReceivedAt(), "ACCEPTED"))
+      return rawEventRepository.findByClientEventId(request.client_event_id())
+          .map(e -> toResponse(e.getEventId(), e.getReceivedAt(), "ACCEPTED"))
           .orElseThrow(() -> new ResponseStatusException(
               HttpStatus.INTERNAL_SERVER_ERROR, "idempotency replay record missing"));
     }
 
     // New event — persist raw for audit, then publish to Kafka post-commit
     String rawEventId = "raw-" + UUID.randomUUID();
-    String ingressEventId = "ing-" + UUID.randomUUID();
-    // Use the active OTel trace ID so the same ID appears in Tempo spans, Loki logs,
-    // DB records, and Kafka event envelopes — enabling single-ID cross-layer correlation.
-    String traceId = resolveTraceId();
+    // event_id = OTel trace ID: the unified identity across Tempo spans, Loki logs,
+    // DB records, and Kafka event envelopes — single-ID cross-layer correlation.
+    String eventId = resolveTraceId();
     Instant now = Instant.now();
 
     String payloadJson = serialize(request);
@@ -104,18 +99,18 @@ public class IngressService {
     // Build the canonical event envelope for downstream consumers
     Map<String, Object> envelopePayload = new HashMap<>();
     envelopePayload.put("rawEventId", rawEventId);
-    envelopePayload.put("ingressEventId", ingressEventId);
+    envelopePayload.put("eventId", eventId);
     envelopePayload.put("eventIntent", request.event_intent());
     envelopePayload.put("sourceType", "HTTP");
     envelopePayload.put("sourceEventId", request.source_event_id());
     envelopePayload.put("userPayload", request.payload());
 
     EventEnvelope<Map<String, Object>> envelope = new EventEnvelope<>(
-        ingressEventId,
+        eventId,
         TOPIC,
         1,
         now,
-        new RequestContext(traceId, requestId, request.idempotency_key(),
+        new RequestContext(eventId, requestId, request.client_event_id(),
             "anonymous", now),
         request.agent_id(),
         null,
@@ -125,10 +120,10 @@ public class IngressService {
 
     IngressRawEventEntity entity = new IngressRawEventEntity(
         rawEventId,
-        ingressEventId,
-        traceId,
+        eventId,
+        eventId,          // trace_id column mirrors event_id (= OTel trace ID)
         requestId,
-        request.idempotency_key(),
+        request.client_event_id(),
         "HTTP",
         "HTTP/1.1",
         request.event_intent(),
@@ -142,7 +137,7 @@ public class IngressService {
 
     // Always persist the raw event — provides full audit trail regardless of Kafka state
     rawEventRepository.save(entity);
-    idempotencyService.markCompleted(request.idempotency_key(), ingressEventId);
+    idempotencyService.markCompleted(request.client_event_id(), eventId);
 
     // Register a post-commit hook: try Kafka immediately; fall back to outbox on failure
     final String finalPartitionKey = partitionKey;
@@ -154,10 +149,10 @@ public class IngressService {
       }
     });
 
-    log.info("ingress accepted ingressEventId={} traceId={} idempotencyKey={}",
-        ingressEventId, traceId, request.idempotency_key());
+    log.info("ingress accepted eventId={} clientEventId={}",
+        eventId, request.client_event_id());
 
-    return toResponse(ingressEventId, traceId, now, "ACCEPTED");
+    return toResponse(eventId, now, "ACCEPTED");
   }
 
   private void validate(IngressSubmitRequest request, String requestId, String authorization) {
@@ -167,16 +162,16 @@ public class IngressService {
     if (blank(requestId) || blank(authorization)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing required headers");
     }
-    if (blank(request.idempotency_key()) || blank(request.event_intent()) || request.payload() == null) {
+    if (blank(request.client_event_id()) || blank(request.event_intent()) || request.payload() == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing required request fields");
     }
   }
 
   private IngressAcceptedResponse toResponse(
-      String ingressEventId, String traceId, Instant receivedAt, String status) {
+      String eventId, Instant receivedAt, String status) {
     return new IngressAcceptedResponse(
-        traceId,
-        new IngressAcceptedResponse.Data(true, ingressEventId, receivedAt.toString(), status));
+        eventId,
+        new IngressAcceptedResponse.Data(true, receivedAt.toString(), status));
   }
 
   private String hashPayload(IngressSubmitRequest request) {

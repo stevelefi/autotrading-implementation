@@ -40,14 +40,14 @@ public class OrderQaController {
 
   /**
    * Seed an order_intent + order_ledger pair.
-   * Request fields: signalId, agentId, instrumentId, idempotencyKey, side, qty, orderType,
+   * Request fields: signalId, agentId, instrumentId, clientEventId, side, qty, orderType,
    *                 timeInForce, initialState (default PENDING_SUBMISSION).
-   * Returns: orderIntentId, idempotencyKey.
+   * Returns: orderIntentId, clientEventId.
    */
   @PostMapping("/seed")
   public Map<String, String> seed(@RequestBody Map<String, Object> req) {
     String orderIntentId  = "qa-order-"  + UUID.randomUUID();
-    String idempotencyKey = str(req, "idempotencyKey", "qa-idem-" + UUID.randomUUID());
+    String clientEventId  = str(req, "clientEventId", "qa-cev-" + UUID.randomUUID());
     String agentId        = str(req, "agentId", "qa-agent");
     String signalId       = str(req, "signalId", "qa-signal-" + UUID.randomUUID());
     String instrumentId   = str(req, "instrumentId", "QA_INSTRUMENT");
@@ -61,16 +61,16 @@ public class OrderQaController {
 
     jdbc.update(
         "INSERT INTO order_intents "
-        + "(order_intent_id, signal_id, agent_id, instrument_id, idempotency_key, "
+        + "(order_intent_id, signal_id, agent_id, instrument_id, client_event_id, "
         + " side, qty, order_type, time_in_force, submission_deadline, created_at) "
-        + "VALUES (:id, :signalId, :agentId, :instrumentId, :idempotencyKey, "
+        + "VALUES (:id, :signalId, :agentId, :instrumentId, :clientEventId, "
         + " :side, :qty, :orderType, :timeInForce, :deadline, :now)",
         new MapSqlParameterSource()
             .addValue("id",             orderIntentId)
             .addValue("signalId",       signalId)
             .addValue("agentId",        agentId)
             .addValue("instrumentId",   instrumentId)
-            .addValue("idempotencyKey", idempotencyKey)
+            .addValue("clientEventId", clientEventId)
             .addValue("side",           side)
             .addValue("qty",            qty)
             .addValue("orderType",      orderType)
@@ -91,7 +91,7 @@ public class OrderQaController {
 
     return Map.of(
         "order_intent_id", orderIntentId,
-        "idempotency_key", idempotencyKey,
+        "client_event_id", clientEventId,
         "initial_state",   initialState);
   }
 
@@ -100,7 +100,7 @@ public class OrderQaController {
   @GetMapping("/state")
   public Map<String, Object> state(
       @RequestParam(required = false) String traceId,
-      @RequestParam(required = false) String idempotencyKey,
+      @RequestParam(required = false) String clientEventId,
       @RequestParam(required = false) String agentId,
       @RequestParam(required = false) String orderIntentId) {
     if (orderIntentId != null) {
@@ -116,10 +116,10 @@ public class OrderQaController {
               + "ORDER BY sequence_no",
               Map.of("v", orderIntentId)));
     }
-    if (idempotencyKey != null) {
+    if (clientEventId != null) {
       return Map.of("order_intents", jdbc.queryForList(
-          "SELECT * FROM order_intents WHERE idempotency_key = :v",
-          Map.of("v", idempotencyKey)));
+          "SELECT * FROM order_intents WHERE client_event_id = :v",
+          Map.of("v", clientEventId)));
     }
     if (agentId != null) {
       return Map.of("order_intents", jdbc.queryForList(
@@ -184,14 +184,14 @@ public class OrderQaController {
     if (testRunPrefix != null) {
       deleted += jdbc.update(
           "DELETE FROM order_state_history WHERE order_intent_id IN "
-          + "(SELECT order_intent_id FROM order_intents WHERE idempotency_key LIKE :v)",
+          + "(SELECT order_intent_id FROM order_intents WHERE client_event_id LIKE :v)",
           Map.of("v", testRunPrefix + "%"));
       deleted += jdbc.update(
           "DELETE FROM order_ledger WHERE order_intent_id IN "
-          + "(SELECT order_intent_id FROM order_intents WHERE idempotency_key LIKE :v)",
+          + "(SELECT order_intent_id FROM order_intents WHERE client_event_id LIKE :v)",
           Map.of("v", testRunPrefix + "%"));
       deleted += jdbc.update(
-          "DELETE FROM order_intents WHERE idempotency_key LIKE :v",
+          "DELETE FROM order_intents WHERE client_event_id LIKE :v",
           Map.of("v", testRunPrefix + "%"));
     }
     return Map.of("deleted_rows", deleted);
@@ -205,7 +205,7 @@ public class OrderQaController {
     List<Map<String, Object>> intents = jdbc.queryForList(
         "SELECT oi.*, ol.state, ol.state_version FROM order_intents oi "
         + "LEFT JOIN order_ledger ol ON oi.order_intent_id = ol.order_intent_id "
-        + "WHERE oi.idempotency_key LIKE :prefix",
+        + "WHERE oi.client_event_id LIKE :prefix",
         Map.of("prefix", traceId + "%"));
     return Map.of(
         "trace_id",            traceId,
@@ -213,7 +213,7 @@ public class OrderQaController {
         "order_state_history", intents.isEmpty() ? List.of() :
             jdbc.queryForList(
                 "SELECT * FROM order_state_history WHERE order_intent_id IN "
-                + "(SELECT order_intent_id FROM order_intents WHERE idempotency_key LIKE :prefix) "
+                + "(SELECT order_intent_id FROM order_intents WHERE client_event_id LIKE :prefix) "
                 + "ORDER BY order_intent_id, sequence_no",
                 Map.of("prefix", traceId + "%")));
   }

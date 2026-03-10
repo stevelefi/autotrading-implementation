@@ -14,8 +14,8 @@ public class IngressRawEventEntity implements Persistable<String> {
   @Column("raw_event_id")
   private String rawEventId;
 
-  @Column("ingress_event_id")
-  private String ingressEventId;
+  @Column("event_id")
+  private String eventId;
 
   @Column("trace_id")
   private String traceId;
@@ -23,8 +23,8 @@ public class IngressRawEventEntity implements Persistable<String> {
   @Column("request_id")
   private String requestId;
 
-  @Column("idempotency_key")
-  private String idempotencyKey;
+  @Column("client_event_id")
+  private String clientEventId;
 
   @Column("source_type")
   private String sourceType;
@@ -62,10 +62,10 @@ public class IngressRawEventEntity implements Persistable<String> {
 
   public IngressRawEventEntity(
       String rawEventId,
-      String ingressEventId,
+      String eventId,
       String traceId,
       String requestId,
-      String idempotencyKey,
+      String clientEventId,
       String sourceType,
       String sourceProtocol,
       String eventIntent,
@@ -77,10 +77,10 @@ public class IngressRawEventEntity implements Persistable<String> {
       String ingestionStatus,
       Instant receivedAt) {
     this.rawEventId = rawEventId;
-    this.ingressEventId = ingressEventId;
+    this.eventId = eventId;
     this.traceId = traceId;
     this.requestId = requestId;
-    this.idempotencyKey = idempotencyKey;
+    this.clientEventId = clientEventId;
     this.sourceType = sourceType;
     this.sourceProtocol = sourceProtocol;
     this.eventIntent = eventIntent;
@@ -95,10 +95,10 @@ public class IngressRawEventEntity implements Persistable<String> {
   }
 
   public String getRawEventId() { return rawEventId; }
-  public String getIngressEventId() { return ingressEventId; }
+  public String getEventId() { return eventId; }
   public String getTraceId() { return traceId; }
   public String getRequestId() { return requestId; }
-  public String getIdempotencyKey() { return idempotencyKey; }
+  public String getClientEventId() { return clientEventId; }
   public String getSourceType() { return sourceType; }
   public String getSourceProtocol() { return sourceProtocol; }
   public String getEventIntent() { return eventIntent; }

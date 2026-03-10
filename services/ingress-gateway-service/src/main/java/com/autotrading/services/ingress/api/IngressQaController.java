@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Endpoints:
  * <ul>
  *   <li>POST  /internal/qa/seed              – insert a controlled ingress_raw_events row
- *   <li>GET   /internal/qa/state             – query rows by traceId / idempotencyKey / agentId
- *   <li>DELETE /internal/qa/data             – delete rows by agentId or idempotency-key prefix
+ *   <li>GET   /internal/qa/state             – query rows by traceId / clientEventId / agentId
+ *   <li>DELETE /internal/qa/data             – delete rows by agentId or client-event-id prefix
  *   <li>GET   /internal/qa/snapshot          – all ingress rows for a trace (for assertion)
  * </ul>
  */
@@ -43,43 +43,43 @@ public class IngressQaController {
 
   /**
    * Insert a controlled ingress_raw_events row.
-   * Request fields: traceId (required), agentId, idempotencyKey, sourceType, payloadJson.
-   * Returns the generated rawEventId and ingressEventId.
+   * Request fields: traceId (required), agentId, clientEventId, sourceType, payloadJson.
+   * Returns the generated rawEventId and eventId.
    */
   @PostMapping("/seed")
   public Map<String, String> seed(@RequestBody Map<String, Object> req) {
     String rawEventId     = "qa-raw-"     + UUID.randomUUID();
-    String ingressEventId = "qa-ingress-" + UUID.randomUUID();
+    String eventId        = "qa-event-"  + UUID.randomUUID();
     String traceId        = str(req, "traceId", "qa-trace-" + UUID.randomUUID());
-    String idempotencyKey = str(req, "idempotencyKey", "qa-idem-" + UUID.randomUUID());
+    String clientEventId  = str(req, "clientEventId", "qa-cev-" + UUID.randomUUID());
     String agentId        = str(req, "agentId", "qa-agent");
     String sourceType     = str(req, "sourceType", "QA");
     String payloadJson    = str(req, "payloadJson", "{\"qa\":true}");
 
     jdbc.update(
         "INSERT INTO ingress_raw_events "
-        + "(raw_event_id, ingress_event_id, trace_id, request_id, idempotency_key, "
+        + "(raw_event_id, event_id, trace_id, request_id, client_event_id, "
         + " source_type, source_protocol, event_intent, source_event_id, agent_id, "
         + " integration_id, principal_json, payload_json, ingestion_status, received_at) "
-        + "VALUES (:rawEventId, :ingressEventId, :traceId, :requestId, :idempotencyKey, "
+        + "VALUES (:rawEventId, :eventId, :traceId, :requestId, :clientEventId, "
         + " :sourceType, 'QA', 'QA_SEED', NULL, :agentId, "
         + " NULL, NULL, :payloadJson, 'PROCESSED', :now)",
         new MapSqlParameterSource()
-            .addValue("rawEventId",     rawEventId)
-            .addValue("ingressEventId", ingressEventId)
-            .addValue("traceId",        traceId)
-            .addValue("requestId",      "qa-req-" + UUID.randomUUID())
-            .addValue("idempotencyKey", idempotencyKey)
-            .addValue("sourceType",     sourceType)
-            .addValue("agentId",        agentId)
-            .addValue("payloadJson",    payloadJson)
-            .addValue("now",            Timestamp.from(Instant.now())));
+            .addValue("rawEventId",    rawEventId)
+            .addValue("eventId",       eventId)
+            .addValue("traceId",       traceId)
+            .addValue("requestId",     "qa-req-" + UUID.randomUUID())
+            .addValue("clientEventId", clientEventId)
+            .addValue("sourceType",    sourceType)
+            .addValue("agentId",       agentId)
+            .addValue("payloadJson",   payloadJson)
+            .addValue("now",           Timestamp.from(Instant.now())));
 
     return Map.of(
-        "raw_event_id",     rawEventId,
-        "ingress_event_id", ingressEventId,
-        "trace_id",         traceId,
-        "idempotency_key",  idempotencyKey);
+        "raw_event_id",    rawEventId,
+        "event_id",        eventId,
+        "trace_id",        traceId,
+        "client_event_id", clientEventId);
   }
 
   // ─── State query ─────────────────────────────────────────────────────────────
@@ -87,17 +87,17 @@ public class IngressQaController {
   @GetMapping("/state")
   public List<Map<String, Object>> state(
       @RequestParam(required = false) String traceId,
-      @RequestParam(required = false) String idempotencyKey,
+      @RequestParam(required = false) String clientEventId,
       @RequestParam(required = false) String agentId) {
     if (traceId != null) {
       return jdbc.queryForList(
           "SELECT * FROM ingress_raw_events WHERE trace_id = :v",
           Map.of("v", traceId));
     }
-    if (idempotencyKey != null) {
+    if (clientEventId != null) {
       return jdbc.queryForList(
-          "SELECT * FROM ingress_raw_events WHERE idempotency_key = :v",
-          Map.of("v", idempotencyKey));
+          "SELECT * FROM ingress_raw_events WHERE client_event_id = :v",
+          Map.of("v", clientEventId));
     }
     if (agentId != null) {
       return jdbc.queryForList(
@@ -124,7 +124,7 @@ public class IngressQaController {
     }
     if (testRunPrefix != null) {
       deleted += jdbc.update(
-          "DELETE FROM ingress_raw_events WHERE idempotency_key LIKE :v",
+          "DELETE FROM ingress_raw_events WHERE client_event_id LIKE :v",
           Map.of("v", testRunPrefix + "%"));
     }
     return Map.of("deleted_rows", deleted);

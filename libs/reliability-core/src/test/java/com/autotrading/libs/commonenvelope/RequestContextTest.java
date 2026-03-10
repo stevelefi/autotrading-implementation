@@ -16,7 +16,7 @@ class RequestContextTest {
 
     assertThat(ctx.traceId()).isEqualTo("trace-1");
     assertThat(ctx.requestId()).isEqualTo("req-1");
-    assertThat(ctx.idempotencyKey()).isEqualTo("idem-1");
+    assertThat(ctx.clientEventId()).isEqualTo("idem-1");
     assertThat(ctx.principalId()).isEqualTo("principal-1");
     assertThat(ctx.receivedAtUtc()).isEqualTo(now);
   }
@@ -36,10 +36,10 @@ class RequestContextTest {
   }
 
   @Test
-  void rejectsNullIdempotencyKey() {
+  void rejectsNullClientEventId() {
     assertThatNullPointerException()
         .isThrownBy(() -> new RequestContext("t", "r", null, "p", Instant.now()))
-        .withMessageContaining("idempotencyKey");
+        .withMessageContaining("clientEventId");
   }
 
   @Test

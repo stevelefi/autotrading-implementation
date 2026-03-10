@@ -6,7 +6,7 @@ manual_trace.py — Send an ingress event, capture the trace ID, tail Loki logs,
 Usage examples:
   python3 scripts/manual_trace.py
   python3 scripts/manual_trace.py --agent-id my-agent --qty 5 --side SELL
-  python3 scripts/manual_trace.py --idempotency-key my-key-001 --no-browser
+  python3 scripts/manual_trace.py --client-event-id my-key-001 --no-browser
   python3 scripts/manual_trace.py --skip-pipeline-watch --loki-since 30m
   python3 scripts/manual_trace.py --token my-secret-token --skip-loki
 """
@@ -50,8 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # --- Ingress event fields ---
     g = p.add_argument_group("Ingress event")
-    g.add_argument("--idempotency-key", default=None,
-                   help="Idempotency key (default: auto-generated timestamp key)")
+    g.add_argument("--client-event-id", default=None,
+                   help="Client event ID (default: auto-generated timestamp key)")
     g.add_argument("--event-intent", default="TRADE_SIGNAL", metavar="INTENT",
                    help="event_intent value (default: TRADE_SIGNAL)")
     g.add_argument("--agent-id", default="agent-smoke-pipeline", metavar="ID",
@@ -151,11 +151,11 @@ def _http_post(url: str, payload: dict, headers: dict, timeout: int = 15) -> tup
 
 def send_event(args: argparse.Namespace) -> tuple[int, dict]:
     ts = _ts()
-    idempotency_key = args.idempotency_key or f"debug-{ts}"
+    client_event_id = args.client_event_id or f"debug-{ts}"
     request_id      = args.request_id      or f"req-{ts}"
 
     payload = {
-        "idempotency_key": idempotency_key,
+        "client_event_id": client_event_id,
         "event_intent":    args.event_intent,
         "agent_id":        args.agent_id,
         "payload":         {"side": args.side, "qty": args.qty},
@@ -167,7 +167,7 @@ def send_event(args: argparse.Namespace) -> tuple[int, dict]:
 
     _print_section("Sending Ingress Event")
     print(f"  URL:             {args.ingress_url}")
-    print(f"  idempotency_key: {idempotency_key}")
+    print(f"  client_event_id: {client_event_id}")
     print(f"  event_intent:    {args.event_intent}")
     print(f"  agent_id:        {args.agent_id}")
     print(f"  payload:         side={args.side}, qty={args.qty}")
@@ -195,15 +195,11 @@ def extract_trace(status: int, body: dict) -> str | None:
     if status not in (200, 202):
         print(f"  [WARN] Unexpected status {status}. Trace ID may not be available.")
 
-    trace_id = body.get("trace_id") or (body.get("data") or {}).get("trace_id")
+    trace_id = body.get("event_id")
     if trace_id:
-        print(f"  trace_id: {trace_id}")
+        print(f"  event_id: {trace_id}")
     else:
-        print("  [WARN] No trace_id in response body.")
-
-    ingress_event_id = (body.get("data") or {}).get("ingress_event_id")
-    if ingress_event_id:
-        print(f"  ingress_event_id: {ingress_event_id}")
+        print("  [WARN] No event_id in response body.")
 
     return trace_id
 

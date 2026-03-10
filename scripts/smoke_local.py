@@ -180,7 +180,7 @@ def main() -> int:
         print("\n=== Phase 2: ingress idempotency ===", flush=True)
         ingress_idempotency_key = f"smoke-idem-{ts}"
         payload = {
-            "idempotency_key": ingress_idempotency_key,
+            "client_event_id": ingress_idempotency_key,
             "event_intent": "TRADE_SIGNAL",
             "agent_id": "agent-smoke",
             "payload": {"side": "BUY", "qty": 1},
@@ -196,7 +196,7 @@ def main() -> int:
         })
 
         conflict_payload = {
-            "idempotency_key": ingress_idempotency_key,
+            "client_event_id": ingress_idempotency_key,
             "event_intent": "TRADE_SIGNAL",
             "agent_id": "agent-smoke",
             "payload": {"side": "BUY", "qty": 2},
@@ -214,11 +214,11 @@ def main() -> int:
 
         ensure(first.status == 202, f"expected first ingress status 202, got {first.status}")
         ensure(second.status == 202, f"expected second ingress status 202, got {second.status}")
-        first_id = get_nested(first.body_json, "data", "ingress_event_id")
-        second_id = get_nested(second.body_json, "data", "ingress_event_id")
-        ensure(first_id is not None and first_id == second_id, "expected replay ingress_event_id to match")
-        ensure(third.status == 409, f"expected conflict ingress status 409, got {third.status}")
-        summaries.append("Ingress idempotency replay/conflict checks passed")
+        first_id = (first.body_json or {}).get("event_id")
+        second_id = (second.body_json or {}).get("event_id")
+        ensure(first_id is not None and first_id == second_id, "expected replay event_id to match")
+        ensure(third.status == 202, f"expected first-write-wins ingress status 202, got {third.status}")
+        summaries.append("Ingress idempotency replay/first-write-wins checks passed")
         print("  ingress idempotency passed", flush=True)
 
         print("\n=== Phase 3: risk->order->broker command path ===", flush=True)
@@ -232,7 +232,7 @@ def main() -> int:
 
         risk_idempotency_key = f"smoke-command-{ts}"
         risk_payload = {
-            "idempotency_key": risk_idempotency_key,
+            "client_event_id": risk_idempotency_key,
             "signal_id": f"sig-smoke-{ts}",
             "qty": 1,
             "side": "BUY",
@@ -266,7 +266,7 @@ def main() -> int:
 
         print("\n=== Phase 4: 60s timeout freeze drill ===", flush=True)
         timeout_result = http_json("POST", f"{order_url}/internal/smoke/timeout-drill", {
-            "idempotency_key": f"smoke-timeout-{ts}",
+            "client_event_id": f"smoke-timeout-{ts}",
         })
         order_stats = http_json("GET", f"{order_url}/internal/smoke/stats")
 
@@ -318,7 +318,7 @@ def main() -> int:
 
         pipeline_ingress_key = f"smoke-pipeline-{ts}"
         pipeline_ingress_payload = {
-            "idempotency_key": pipeline_ingress_key,
+            "client_event_id": pipeline_ingress_key,
             "event_intent": "TRADE_SIGNAL",
             "agent_id": "agent-smoke-pipeline",
             "payload": {"side": "BUY", "qty": 1},

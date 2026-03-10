@@ -163,7 +163,7 @@ class MandatoryScenariosTest {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-test")
             .setRequestId("req-test")
-            .setIdempotencyKey(idemKey)
+            .setClientEventId(idemKey)
             .setPrincipalId("svc-test")
             .build())
         .setAgentId(agentId)
@@ -186,8 +186,8 @@ class MandatoryScenariosTest {
   // ────────────────────────────────────────────────────────────────────────
 
   @Test
-  @DisplayName("Scenario 1: Duplicate idempotency key yields single broker submit")
-  void duplicateIdempotencyKeyIgnored() throws Exception {
+  @DisplayName("Scenario 1: Duplicate client_event_id yields single broker submit")
+  void duplicateClientEventIdIgnored() throws Exception {
     Clock fixed = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
     GrpcStack stack = buildFullStack(fixed);
 
@@ -237,7 +237,7 @@ class MandatoryScenariosTest {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-bad")
             .setRequestId("req-bad")
-            .setIdempotencyKey("idem-bad")
+            .setClientEventId("idem-bad")
             .setPrincipalId("svc-test")
             .build())
         .setAgentId("agent-momo-01")
@@ -275,7 +275,7 @@ class MandatoryScenariosTest {
         .setRequestContext(RequestContext.newBuilder()
             .setTraceId("trc-ext")
             .setRequestId("req-ext")
-            .setIdempotencyKey("idem-ext")
+            .setClientEventId("idem-ext")
             .setPrincipalId("svc-test")
             .build())
         .setAgentId("agent-momo-01")

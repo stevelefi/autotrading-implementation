@@ -22,12 +22,12 @@ class InMemoryIdempotencyServiceTest {
   }
 
   @Test
-  void sameKeyDifferentPayloadReturnsConflict() {
+  void sameKeyDifferentPayloadAlsoReturnsReplay() {
     InMemoryIdempotencyService service = new InMemoryIdempotencyService();
 
     service.claim(new IdempotencyClaim("k1", "payload-a", Instant.now()));
-    ClaimResult conflict = service.claim(new IdempotencyClaim("k1", "payload-b", Instant.now()));
+    ClaimResult replay = service.claim(new IdempotencyClaim("k1", "payload-b", Instant.now()));
 
-    assertThat(conflict.outcome()).isEqualTo(ClaimOutcome.CONFLICT);
+    assertThat(replay.outcome()).isEqualTo(ClaimOutcome.REPLAY);
   }
 }

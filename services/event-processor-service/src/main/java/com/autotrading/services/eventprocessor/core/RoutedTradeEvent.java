@@ -5,10 +5,10 @@ import java.util.Map;
 
 public record RoutedTradeEvent(
     String tradeEventId,
-    String ingressEventId,
+    String eventId,
     String rawEventId,
     String traceId,
-    String idempotencyKey,
+    String clientEventId,
     String sourceType,
     String sourceEventId,
     String agentId,
