@@ -40,7 +40,7 @@ flowchart TD
     K_ALERTS[/"⚠ system.alerts.v1<br/>FROZEN / kill-switch alerts"/]:::altKaf
 
     IBKR["ibkr-connector-service<br/>gRPC :9094 | SubmitOrder RPC<br/>Broker submission · Execution tracking"]:::grpcSvc
-    DB_IBKR[(broker_orders<br/>executions<br/>idempotency_keys)]:::db
+    DB_IBKR[(broker_orders<br/>executions<br/>idempotency_keys<br/>broker_health_status)]:::db
     K_FILLS[/"fills.executed.v1<br/>execution fill events"/]:::kaf
     K_STATUS[/"orders.status.v1<br/>SUBMITTED / FILLED / REJECTED"/]:::kaf
 
@@ -103,6 +103,10 @@ flowchart TD
   Kafka publish fallback. All other services publish directly via `DirectKafkaPublisher`.
 - **Inbox dedup** — event-processor and agent-runtime write to `consumer_inbox` before
   processing to achieve exactly-once semantics at the application layer.
+- **Broker health gate** — ingress-gateway and order-service check `BrokerHealthCache`
+  (backed by `IbkrHealthProbe`) before forwarding to ibkr-connector. When the probe detects
+  `DOWN`, new orders are rejected immediately. `BrokerHealthPersister` persists each
+  UP/DOWN transition to `broker_health_status` for audit visibility.
 
 ---
 
@@ -134,7 +138,7 @@ All tables live in the shared PostgreSQL instance (`autotrading` schema).
 
 | Table | R/W | Purpose |
 |-------|-----|---------|
-| `idempotency_records` | R+W | De-duplicate incoming HTTP requests by `idempotency_key` |
+| `idempotency_records` | R+W | De-duplicate incoming HTTP requests by `client_event_id` |
 | `ingress_raw_events` | W | Persist raw event before publishing to Kafka |
 | `outbox_events` | R+W | Transactional outbox — Kafka publish fallback with retry backoff |
 
@@ -177,6 +181,7 @@ All tables live in the shared PostgreSQL instance (`autotrading` schema).
 | `idempotency_records` | R+W | De-duplicate inbound gRPC SubmitOrder calls |
 | `broker_orders` | W | Broker-side order record with `order_ref` and `perm_id` |
 | `executions` | W | Fill records (qty, price, commission) |
+| `broker_health_status` | R+W | UP/DOWN health transitions — written by `BrokerHealthPersister`, seeded with `broker_id='ibkr'` |
 
 ### monitoring-api
 

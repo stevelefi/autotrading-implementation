@@ -9,7 +9,7 @@
     │
     │  HTTP POST /api/v1/trade-events/manual
     │  Headers: X-Actor-Id, X-Request-Id
-    │  Body: { idempotency_key, agent_id, instrument_id, side, qty, ... }
+    │  Body: { client_event_id, agent_id, instrument_id, side, qty, ... }
     ▼
 ┌──────────────────────────────────┐
 │    ingress-gateway-service       │  HTTP :18080
@@ -17,7 +17,7 @@
 │  1. Normalize + validate         │
 │  2. @Transactional:              │
 │     - Persist → ingress_raw_events  (always; audit trail)
-│     - Claim idempotency key      │
+│     - Claim client_event_id      │
 │  3. afterCommit() callback:      │
 │     KafkaFirstPublisher.publish()│
 │     ├─ Kafka OK  → delivered     │
@@ -258,16 +258,16 @@ system.alerts.v1: CRITICAL:status_timeout_60s
 
 ---
 
-## 5. Idempotency Key Flow
+## 5. client_event_id Deduplication Flow
 
 ```
-Client sends idempotency_key = "k-abc-123"
+Client sends client_event_id = "k-abc-123"
 
 ingress-gateway-service:
     claim({key="k-abc-123", payloadHash=sha(body)})
     → NEW     → proceed, persist, publish
-    → REPLAY  → return cached response (DUPLICATE status)
-    → CONFLICT → reject (same key, different payload hash)
+    → REPLAY  → return cached response (same event_id, first-write-wins)
+    → CONFLICT → not raised (first-write-wins semantics; same key, any payload = REPLAY)
 
 order-service:
     same claim on CreateOrderIntent
@@ -319,7 +319,7 @@ All 8 services emit logs in this format:
 
 ```
 2026-03-06T06:30:00Z level= INFO service=risk-service
-  trace_id=trc-aaa request_id=evt-bbb idempotency_key=k-abc-123 principal_id=
+  trace_id=trc-aaa request_id=evt-bbb client_event_id=k-abc-123 principal_id=
   agent_id=agent-alpha signal_id=sig-xyz order_intent_id= instrument_id=AAPL
   [grpc-default-executor-0] c.a.s.risk.grpc.RiskDecisionGrpcService - ...
 ```
@@ -329,7 +329,7 @@ MDC keys are set at each entry point and cleared in `finally` blocks:
 | Entry point | Keys set |
 |---|---|
 | HTTP handlers (`IngressController`) | `agent_id` |
-| Kafka consumers (`EventProcessorConsumer`, `AgentRuntimeConsumer`, `FillsConsumer`, `AlertEventConsumer`) | `trace_id`, `idempotency_key`, `request_id`, `agent_id`, `signal_id`, `instrument_id` |
+| Kafka consumers (`EventProcessorConsumer`, `AgentRuntimeConsumer`, `FillsConsumer`, `AlertEventConsumer`) | `trace_id`, `client_event_id`, `request_id`, `agent_id`, `signal_id`, `instrument_id` |
 | gRPC services (`RiskDecisionGrpcService`, `OrderCommandGrpcService`, `BrokerCommandGrpcService`) | `agent_id`, `signal_id` or `order_intent_id`, `instrument_id` |
 
 Configured in each service's `src/main/resources/application.yml` under `logging.pattern.console`.
