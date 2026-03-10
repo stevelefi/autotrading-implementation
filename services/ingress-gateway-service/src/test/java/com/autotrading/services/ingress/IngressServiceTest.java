@@ -1,13 +1,24 @@
 package com.autotrading.services.ingress;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import io.micrometer.tracing.Tracer;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.kafka.KafkaFirstPublisher;
@@ -19,15 +30,8 @@ import com.autotrading.services.ingress.db.IngressRawEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import io.micrometer.tracing.Tracer;
 
 class IngressServiceTest {
 
@@ -117,5 +121,32 @@ class IngressServiceTest {
 
     assertThat(second.event_id()).isEqualTo(first.event_id());
     verify(mockKafkaFirstPublisher, times(1)).publish(any(), any(), any());
+  }
+
+  @Test
+  void brokerDownReturns503() {
+    // Build a service wired with a "broker is DOWN" health supplier
+    IngressRawEventRepository stubRepo = mock(IngressRawEventRepository.class);
+    IngressService brokerDownService = new IngressService(
+        new InMemoryIdempotencyService(),
+        mockKafkaFirstPublisher,
+        stubRepo,
+        new ObjectMapper().registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
+        mock(Tracer.class),
+        () -> false);
+
+    IngressSubmitRequest request = new IngressSubmitRequest(
+        "idemp-broker-down",
+        "TRADE_SIGNAL",
+        "agent-1",
+        null,
+        null,
+        Map.of("side", "BUY", "qty", 10));
+
+    assertThatThrownBy(() -> brokerDownService.accept(request, "req-down", "Bearer token"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(t -> ((ResponseStatusException) t).getStatusCode())
+        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
   }
 }

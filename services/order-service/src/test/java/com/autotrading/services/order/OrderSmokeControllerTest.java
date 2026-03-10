@@ -8,14 +8,11 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
-import com.autotrading.services.order.db.OrderIntentRepository;
-import com.autotrading.services.order.db.OrderLedgerRepository;
-import com.autotrading.services.order.db.OrderStateHistoryRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.command.v1.CommandStatus;
@@ -24,9 +21,14 @@ import com.autotrading.command.v1.Decision;
 import com.autotrading.command.v1.RequestContext;
 import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.command.v1.SubmitOrderResponse;
+import com.autotrading.libs.health.BrokerHealthCache;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.api.OrderSmokeController;
 import com.autotrading.services.order.core.OrderSafetyEngine;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
 
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
@@ -76,7 +78,10 @@ class OrderSmokeControllerTest {
                 mock(OrderIntentRepository.class),
                 mock(OrderLedgerRepository.class),
                 mock(OrderStateHistoryRepository.class));
-        controller = new OrderSmokeController(engine, brokerStub, metrics, clock);
+        BrokerHealthCache mockHealthCache = mock(BrokerHealthCache.class);
+        when(mockHealthCache.isBrokerAvailable()).thenReturn(true);
+        when(mockHealthCache.lastRefreshedAt()).thenReturn(Instant.now());
+        controller = new OrderSmokeController(engine, brokerStub, metrics, mockHealthCache, clock);
     }
 
     @AfterEach

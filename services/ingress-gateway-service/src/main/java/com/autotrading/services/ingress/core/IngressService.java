@@ -8,9 +8,11 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +31,10 @@ import com.autotrading.services.ingress.api.IngressAcceptedResponse;
 import com.autotrading.services.ingress.api.IngressSubmitRequest;
 import com.autotrading.services.ingress.db.IngressRawEventEntity;
 import com.autotrading.services.ingress.db.IngressRawEventRepository;
-import io.micrometer.tracing.Tracer;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.micrometer.tracing.Tracer;
 
 @Service
 public class IngressService {
@@ -46,6 +48,7 @@ public class IngressService {
   private final IngressRawEventRepository rawEventRepository;
   private final ObjectMapper objectMapper;
   private final Tracer tracer;
+  private final BooleanSupplier brokerHealthCheck;
 
   public IngressService(
       IdempotencyService idempotencyService,
@@ -53,11 +56,23 @@ public class IngressService {
       IngressRawEventRepository rawEventRepository,
       ObjectMapper objectMapper,
       Tracer tracer) {
+    this(idempotencyService, kafkaFirstPublisher, rawEventRepository, objectMapper, tracer, () -> true);
+  }
+
+  @Autowired
+  public IngressService(
+      IdempotencyService idempotencyService,
+      KafkaFirstPublisher kafkaFirstPublisher,
+      IngressRawEventRepository rawEventRepository,
+      ObjectMapper objectMapper,
+      Tracer tracer,
+      BooleanSupplier brokerHealthCheck) {
     this.idempotencyService = idempotencyService;
     this.kafkaFirstPublisher = kafkaFirstPublisher;
     this.rawEventRepository = rawEventRepository;
     this.objectMapper = objectMapper;
     this.tracer = tracer;
+    this.brokerHealthCheck = brokerHealthCheck;
   }
 
   /**
@@ -74,6 +89,15 @@ public class IngressService {
   public IngressAcceptedResponse accept(
       IngressSubmitRequest request, String requestId, String authorization) {
     validate(request, requestId, authorization);
+
+    // Broker health gate — checked before the idempotency claim so the client may
+    // retry with the same client_event_id once the broker recovers.
+    if (!brokerHealthCheck.getAsBoolean()) {
+      log.warn("ingress rejecting event — broker known DOWN clientEventId={}",
+          request.client_event_id());
+      throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+          "broker is currently unavailable — retry later");
+    }
 
     String payloadHash = hashPayload(request);
     ClaimResult claim = idempotencyService.claim(
