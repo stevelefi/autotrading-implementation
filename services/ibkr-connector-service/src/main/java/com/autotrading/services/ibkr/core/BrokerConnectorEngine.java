@@ -109,6 +109,7 @@ public class BrokerConnectorEngine {
     if (!simulatorMode) {
       try {
         var ibkrResponses = restClient.submitOrder(
+            request.getAgentId(),          // resolved to IBKR sub-account by BrokerAccountCache
             null,                          // conid — will be resolved from instrumentId in future
             request.getSide(),
             (int) request.getQty(),

@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,6 +21,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.autotrading.libs.auth.ApiKeyAuthenticator;
+import com.autotrading.libs.auth.AuthenticatedPrincipal;
 import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.kafka.KafkaFirstPublisher;
 import com.autotrading.services.ingress.api.IngressAcceptedResponse;
@@ -134,7 +137,8 @@ class IngressServiceTest {
         new ObjectMapper().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
         mock(Tracer.class),
-        () -> false);
+        () -> false,
+        null /* no auth in test */);
 
     IngressSubmitRequest request = new IngressSubmitRequest(
         "idemp-broker-down",
@@ -148,5 +152,91 @@ class IngressServiceTest {
         .isInstanceOf(ResponseStatusException.class)
         .extracting(t -> ((ResponseStatusException) t).getStatusCode())
         .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+  }
+
+  @Test
+  void unknownApiKeyThrows401() {
+    ApiKeyAuthenticator mockAuth = mock(ApiKeyAuthenticator.class);
+    when(mockAuth.authenticate(any())).thenReturn(Optional.empty());
+    IngressService svc = serviceWithAuth(mockAuth);
+
+    assertThatThrownBy(() -> svc.accept(tradeSignalRequest("k-401"), "req-x", "Bearer unknown-key"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(t -> ((ResponseStatusException) t).getStatusCode())
+        .isEqualTo(HttpStatus.UNAUTHORIZED);
+  }
+
+  @Test
+  void agentNotOwnedByAccountThrows403() {
+    AuthenticatedPrincipal principal = new AuthenticatedPrincipal("acc-other", "hash", 1);
+    ApiKeyAuthenticator mockAuth = mock(ApiKeyAuthenticator.class);
+    when(mockAuth.authenticate(any())).thenReturn(Optional.of(principal));
+    when(mockAuth.isAgentOwnedBy("agent-1", "acc-other")).thenReturn(false);
+    IngressService svc = serviceWithAuth(mockAuth);
+
+    assertThatThrownBy(() -> svc.accept(tradeSignalRequest("k-403"), "req-x", "Bearer valid-key"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(t -> ((ResponseStatusException) t).getStatusCode())
+        .isEqualTo(HttpStatus.FORBIDDEN);
+  }
+
+  @Test
+  void missingBearerPrefixThrows400() {
+    ApiKeyAuthenticator mockAuth = mock(ApiKeyAuthenticator.class);
+    IngressService svc = serviceWithAuth(mockAuth);
+
+    assertThatThrownBy(() -> svc.accept(tradeSignalRequest("k-400"), "req-x", "notbearer"))
+        .isInstanceOf(ResponseStatusException.class)
+        .extracting(t -> ((ResponseStatusException) t).getStatusCode())
+        .isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void validKeyAndOwnedAgentReturns202() {
+    AuthenticatedPrincipal principal = new AuthenticatedPrincipal("acc-ok", "hash", 1);
+    ApiKeyAuthenticator mockAuth = mock(ApiKeyAuthenticator.class);
+    when(mockAuth.authenticate(any())).thenReturn(Optional.of(principal));
+    when(mockAuth.isAgentOwnedBy("agent-1", "acc-ok")).thenReturn(true);
+    IngressRawEventRepository stubRepo = mock(IngressRawEventRepository.class);
+    when(stubRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(stubRepo.findByClientEventId(any())).thenReturn(Optional.empty());
+
+    IngressService svc = new IngressService(
+        new InMemoryIdempotencyService(),
+        mockKafkaFirstPublisher,
+        stubRepo,
+        new ObjectMapper().registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
+        mock(Tracer.class),
+        () -> true,
+        mockAuth);
+
+    IngressAcceptedResponse response = svc.accept(tradeSignalRequest("k-202"), "req-x", "Bearer good-key");
+    assertThat(response.event_id()).isNotBlank();
+  }
+
+  // ------------------------------------------------------------------
+  // Helpers
+  // ------------------------------------------------------------------
+
+  private IngressService serviceWithAuth(ApiKeyAuthenticator mockAuth) {
+    IngressRawEventRepository stubRepo = mock(IngressRawEventRepository.class);
+    when(stubRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(stubRepo.findByClientEventId(any())).thenReturn(Optional.empty());
+    return new IngressService(
+        new InMemoryIdempotencyService(),
+        mockKafkaFirstPublisher,
+        stubRepo,
+        new ObjectMapper().registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
+        mock(Tracer.class),
+        () -> true,
+        mockAuth);
+  }
+
+  private static IngressSubmitRequest tradeSignalRequest(String clientEventId) {
+    return new IngressSubmitRequest(
+        clientEventId, "TRADE_SIGNAL", "agent-1", null, null,
+        Map.of("side", "BUY", "qty", 10));
   }
 }

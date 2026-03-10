@@ -61,3 +61,13 @@ logging:
 qa:
   api:
     enabled: false
+
+broker:
+  health:
+    cache:
+      refresh-interval-ms: ${BROKER_HEALTH_CACHE_REFRESH_INTERVAL_MS:15000}
+
+auth:
+  api-key:
+    cache:
+      refresh-interval-ms: ${AUTH_API_KEY_CACHE_REFRESH_INTERVAL_MS:60000}

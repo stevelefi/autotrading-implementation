@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import com.autotrading.libs.auth.ApiKeyAuthenticator;
 import com.autotrading.libs.health.BrokerHealthCache;
 
 @Configuration
@@ -31,5 +32,17 @@ public class IngressGatewayConfiguration {
   @Bean
   BooleanSupplier brokerHealthGate(BrokerHealthCache brokerHealthCache) {
     return brokerHealthCache::isBrokerAvailable;
+  }
+
+  /**
+   * Cache-backed API key authenticator. Phase 40 — warm before any other
+   * infrastructure cache starts. Refresh interval is configurable via
+   * {@code auth.api-key.cache.refresh-interval-ms}.
+   */
+  @Bean
+  ApiKeyAuthenticator apiKeyAuthenticator(
+      JdbcTemplate jdbcTemplate,
+      @Value("${auth.api-key.cache.refresh-interval-ms:60000}") long refreshIntervalMs) {
+    return new ApiKeyAuthenticator(jdbcTemplate, refreshIntervalMs);
   }
 }
