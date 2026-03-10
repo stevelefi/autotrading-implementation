@@ -94,7 +94,7 @@ See **[docs/OBSERVABILITY.md](OBSERVABILITY.md)** for UIs, LogQL/PromQL queries,
 Every service must:
 - Expose `/actuator/health`, `/actuator/info`, `/actuator/prometheus`
 - Emit structured logs with the full correlation MDC key set:
-  `trace_id`, `request_id`, `idempotency_key`, `principal_id`, `agent_id`, `signal_id`, `order_intent_id`, `instrument_id`
+  `trace_id`, `request_id`, `client_event_id`, `principal_id`, `agent_id`, `signal_id`, `order_intent_id`, `instrument_id`
 - Propagate correlation context via `GrpcCorrelationServerInterceptor` (gRPC) and `HttpCorrelationFilter` (HTTP)
 
 Telemetry split:
@@ -112,8 +112,8 @@ To add a new **log/trace** export target: add an exporter to `infra/observabilit
 ## 5. Reliability and Safety Expectations
 
 ### Idempotency
-- Same key + same payload → replay existing acceptance (`COMMAND_STATUS_DUPLICATE`)
-- Same key + different payload → conflict (`COMMAND_STATUS_REJECTED`)
+- Same `client_event_id` + same payload → replay existing acceptance (202, first-write-wins)
+- Same `client_event_id` + different payload → replay existing acceptance (202, first-write-wins; original response is replayed, new payload is ignored)
 
 ### Outbox/Inbox
 - Outbox row appended in **same transaction** as domain mutation
@@ -121,7 +121,7 @@ To add a new **log/trace** export target: add an exporter to `infra/observabilit
 - In-memory dedup state is **intentionally not kept** between restarts; `ConsumerDeduper` is the authoritative dedup layer
 
 ### Command Safety
-- Retry with the same idempotency key cannot create a duplicate broker submit
+- Retry with the same `client_event_id` cannot create a duplicate broker submit
 - Missing first status within 60 seconds triggers `UNKNOWN_PENDING_RECON` state and `FROZEN` trading mode
 - Signal persisted to DB **before** gRPC call to risk-service (crash-safe: signal is always recoverable)
 - Kill-switch and trading-mode restored from `system_controls` table on `monitoring-api` startup

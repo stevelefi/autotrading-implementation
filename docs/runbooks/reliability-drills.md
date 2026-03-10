@@ -20,8 +20,8 @@
 6. `make down`
 
 ## Smoke Validation Expectations
-1. Ingress replay: same idempotency key + same payload returns same acceptance metadata.
-2. Ingress conflict: same idempotency key + different payload returns conflict.
+1. Ingress replay: same `client_event_id` + same payload returns same acceptance metadata (202, first-write-wins).
+2. Ingress dedup: same `client_event_id` + different payload also returns same original acceptance metadata (202, first-write-wins; new payload is ignored).
 3. gRPC command retry: duplicate command path attempt does not produce duplicate broker submit.
 4. Timeout drill: missing first broker status for 60 seconds drives:
    - order state `UNKNOWN_PENDING_RECON`
