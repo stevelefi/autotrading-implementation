@@ -189,7 +189,7 @@ python3 scripts/stack.py down         # full teardown including volumes
 |--------|---------|-------------|
 | `scripts/branch_check.py` | GitHub flow branch name validator | *(no args)* checks current branch; `<name>` checks a specific name |
 | `scripts/onboard.py` | Account / agent / API-key / broker-account management CLI | `account create/list`, `agent create/list`, `apikey generate/create/list/revoke`, `broker create/list` |
-| `scripts/test.py` | Maven test runner | `unit` \| `coverage` \| `e2e` \| `all` — add `--module <path>` to target one module |
+| `scripts/test.py` | Master test runner | `unit` \| `coverage` \| `e2e` \| `smoke` \| `load` \| `manual` \| `all` \| `full` — add `--module <path>` to target one module; `full` = unit+coverage+e2e+smoke |
 | `scripts/check.py` | Pre-commit gate (all checks + summary) | *(no args)* full gate; `--fast` skips e2e; `--skip-helm` skips Helm; `--only <check>...` |
 | `scripts/stack.py` | Local stack manager | `up` \| `down` \| `infra-up` \| `app-up` \| `app-down` \| `restart-app` \| `build` \| `status` \| `logs` \| `validate` \| `ci` |
 | `scripts/smoke_local.py` | 6-phase smoke suite (requires stack up) | *(no args)* — writes reports to `reports/blitz/` |

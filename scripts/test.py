@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """
-test.py — Run unit, coverage, and e2e tests for the autotrading monorepo.
+test.py — Master test runner for the autotrading monorepo.
 
-Usage:
-    python3 scripts/test.py <command> [options]
+Maven-based commands (no live stack required):
+    unit        Run all unit tests
+    coverage    JaCoCo coverage gate on core modules (≥50% line)
+    e2e         All five test classes in tests/e2e/
+    all         unit + coverage + e2e  (default fail-fast)
 
-Commands:
-    unit        Run all unit tests (mvn -B -DskipITs=true test)
-    coverage    Run JaCoCo coverage gate on core modules (minimum 50% line coverage)
-    e2e         Run all five e2e test classes in tests/e2e/
-    all         Run unit + coverage + e2e in sequence (fails fast)
+Live-stack commands (requires: python3 scripts/stack.py up):
+    smoke       6-phase live integration smoke suite
+    load        20-order concurrent load test + system report
+    manual      Single end-to-end event trace (pass extra args after --)
+
+Combined:
+    full        unit + coverage + e2e + smoke  (complete CI equivalent)
 
 Options:
-    --module <path>   Target a single Maven module, e.g. services/risk-service
-                      Only applies to: unit, coverage
-    --no-fail-fast    Continue on first failure (default: fail fast)
+    --module <path>     Target one Maven module (unit/coverage only)
+    --no-fail-fast      Keep running after a failure (all/full only)
 
 Examples:
     python3 scripts/test.py unit
@@ -22,6 +26,17 @@ Examples:
     python3 scripts/test.py coverage
     python3 scripts/test.py e2e
     python3 scripts/test.py all
+    python3 scripts/test.py all --no-fail-fast
+
+    # requires live stack (python3 scripts/stack.py up first)
+    python3 scripts/test.py smoke
+    python3 scripts/test.py load
+    python3 scripts/test.py manual
+    python3 scripts/test.py manual -- --agent-id agent-smoke --qty 5 --side SELL
+    python3 scripts/test.py manual -- --skip-loki --no-browser
+
+    # full CI run (stack must be up for the smoke phase)
+    python3 scripts/test.py full
 """
 from __future__ import annotations
 
@@ -61,7 +76,18 @@ def mvn(*args: str, check: bool = True) -> int:
     return result.returncode
 
 
-# ── commands ───────────────────────────────────────────────────────────────────
+def run_script(script: str, *extra_args: str, check: bool = True) -> int:
+    """Run a sibling script via the same Python interpreter."""
+    cmd = [sys.executable, str(ROOT / "scripts" / script)] + list(extra_args)
+    print(f"\n$ {' '.join(cmd)}", flush=True)
+    result = subprocess.run(cmd, cwd=ROOT)
+    if check and result.returncode != 0:
+        print(f"\n[test.py] FAILED (exit {result.returncode}): {script}", flush=True)
+        sys.exit(result.returncode)
+    return result.returncode
+
+
+# ── Maven commands ─────────────────────────────────────────────────────────────
 
 
 def cmd_unit(module: str | None = None) -> None:
@@ -91,17 +117,67 @@ def cmd_e2e() -> None:
     mvn("-B", "-pl", "tests/e2e", "-am", "test")
 
 
-def cmd_all(fail_fast: bool = True) -> None:
-    banner("Full test suite: unit + coverage + e2e")
-    steps = [
-        ("unit",     cmd_unit),
-        ("coverage", cmd_coverage),
+# ── Live-stack commands ────────────────────────────────────────────────────────
+
+
+def cmd_smoke() -> None:
+    banner("Smoke suite (6-phase live integration — requires stack up)")
+    print("  Tip: python3 scripts/stack.py up   (if stack is not running)\n", flush=True)
+    run_script("smoke_local.py")
+
+
+def cmd_load() -> None:
+    banner("Load test — 20 concurrent orders + system report (requires stack up)")
+    print("  Tip: python3 scripts/stack.py up   (if stack is not running)\n", flush=True)
+    run_script("load_20_orders.py")
+
+
+def cmd_manual(extra_args: list[str]) -> None:
+    banner("Manual trace — single end-to-end event (requires stack up)")
+    print("  Tip: python3 scripts/stack.py up   (if stack is not running)", flush=True)
+    if extra_args:
+        print(f"  Forwarding args: {' '.join(extra_args)}\n", flush=True)
+    else:
+        print("  Running with defaults (agent-smoke-pipeline, BUY qty=1).\n", flush=True)
+        print("  Pass extra args after '--', e.g.:\n"
+              "    python3 scripts/test.py manual -- --agent-id my-agent --qty 5 --side SELL\n"
+              "    python3 scripts/test.py manual -- --skip-loki --no-browser\n",
+              flush=True)
+    run_script("manual_trace.py", *extra_args)
+
+
+# ── Composite commands ─────────────────────────────────────────────────────────
+
+
+def cmd_all(fail_fast: bool = True, module: str | None = None) -> None:
+    banner("Maven test suite: unit + coverage + e2e")
+    steps: list[tuple[str, object]] = [
+        ("unit",     lambda: cmd_unit(module)),
+        ("coverage", lambda: cmd_coverage(module)),
         ("e2e",      cmd_e2e),
     ]
+    _run_steps(steps, fail_fast)
+
+
+def cmd_full(fail_fast: bool = True, module: str | None = None) -> None:
+    banner("Full CI test suite: unit + coverage + e2e + smoke")
+    print("  NOTE: smoke phase requires the live stack to be running.\n"
+          "        Run 'python3 scripts/stack.py up' before this command.\n",
+          flush=True)
+    steps: list[tuple[str, object]] = [
+        ("unit",     lambda: cmd_unit(module)),
+        ("coverage", lambda: cmd_coverage(module)),
+        ("e2e",      cmd_e2e),
+        ("smoke",    cmd_smoke),
+    ]
+    _run_steps(steps, fail_fast)
+
+
+def _run_steps(steps: list[tuple[str, object]], fail_fast: bool) -> None:
     failed: list[str] = []
     for name, fn in steps:
         try:
-            fn()
+            fn()  # type: ignore[operator]
         except SystemExit as exc:
             if fail_fast:
                 raise
@@ -112,7 +188,7 @@ def cmd_all(fail_fast: bool = True) -> None:
         banner(f"FAILED steps: {', '.join(failed)}")
         sys.exit(1)
     else:
-        banner("All tests PASSED")
+        banner("All steps PASSED")
 
 
 # ── entry point ────────────────────────────────────────────────────────────────
@@ -120,13 +196,13 @@ def cmd_all(fail_fast: bool = True) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run tests for the autotrading monorepo.",
+        description="Master test runner for the autotrading monorepo.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
     parser.add_argument(
         "command",
-        choices=["unit", "coverage", "e2e", "all"],
+        choices=["unit", "coverage", "e2e", "smoke", "load", "manual", "all", "full"],
         help="Test suite to run",
     )
     parser.add_argument(
@@ -137,15 +213,32 @@ def main() -> None:
     parser.add_argument(
         "--no-fail-fast",
         action="store_true",
-        help="Continue running remaining steps after a failure (all command only)",
+        help="Continue running remaining steps after a failure (all/full only)",
+    )
+    # Extra args forwarded verbatim to manual_trace.py when command=manual.
+    # Everything after '--' lands here automatically via argparse.REMAINDER.
+    parser.add_argument(
+        "extra",
+        nargs=argparse.REMAINDER,
+        help="Extra arguments forwarded to manual_trace.py (command=manual only). "
+             "Separate with '--', e.g.:  test.py manual -- --agent-id foo --side SELL",
     )
     args = parser.parse_args()
+
+    # Strip leading '--' separator that argparse.REMAINDER preserves
+    extra = [a for a in (args.extra or []) if a != "--"]
+
+    fail_fast = not args.no_fail_fast
 
     dispatch = {
         "unit":     lambda: cmd_unit(args.module),
         "coverage": lambda: cmd_coverage(args.module),
         "e2e":      cmd_e2e,
-        "all":      lambda: cmd_all(fail_fast=not args.no_fail_fast),
+        "smoke":    cmd_smoke,
+        "load":     cmd_load,
+        "manual":   lambda: cmd_manual(extra),
+        "all":      lambda: cmd_all(fail_fast, args.module),
+        "full":     lambda: cmd_full(fail_fast, args.module),
     }
     dispatch[args.command]()
 
