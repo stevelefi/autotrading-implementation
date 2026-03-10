@@ -56,13 +56,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help="event_intent value (default: TRADE_SIGNAL)")
     g.add_argument("--agent-id", default="agent-smoke-pipeline", metavar="ID",
                    help="agent_id for Kafka partitioning (default: agent-smoke-pipeline; "
-                        "must match a seeded agent with an approved risk policy)")
+                        "must be owned by the account whose API key is used)")
     g.add_argument("--side", default="BUY", choices=["BUY", "SELL"],
                    help="payload.side (default: BUY)")
     g.add_argument("--qty", type=int, default=1, metavar="N",
                    help="payload.qty (default: 1)")
-    g.add_argument("--token", default="smoke-token", metavar="TOKEN",
-                   help="Bearer token for Authorization header (default: smoke-token)")
+    g.add_argument("--token", default="smoke-api-key-local", metavar="TOKEN",
+                   help="Raw API key for Authorization: Bearer header "
+                        "(default: smoke-api-key-local — seeded by smoke_local.py Phase 0 "
+                        "and onboard.py; use 'onboard.py apikey generate' to create a new key)")
     g.add_argument("--request-id", default=None, metavar="ID",
                    help="X-Request-Id header (default: auto-generated)")
 
