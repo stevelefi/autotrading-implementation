@@ -157,6 +157,7 @@ python3 scripts/stack.py down
 | Script | Purpose | Key commands |
 |--------|---------|-------------|
 | `scripts/branch_check.py` | GitHub flow branch name validator | *(no args)* checks current branch; `<name>` checks a specific name |
+| `scripts/onboard.py` | Account / agent / API-key / broker-account management CLI | `account create/list`, `agent create/list`, `apikey generate/create/list/revoke`, `broker create/list` |
 | `scripts/pr.py` | Safe branch + commit + push + GitHub PR (no shell-quoting issues) | `--branch NAME --title TEXT [--body TEXT] [--draft] [--commit-only] [--push-only]` |
 | `scripts/test.py` | Maven test runner | `unit` \| `coverage` \| `e2e` \| `all` — add `--module <path>` to target one module |
 | `scripts/check.py` | Pre-commit gate (all checks + summary) | *(no args)* full gate; `--fast` skips e2e; `--skip-helm` skips Helm; `--only <check>...` |

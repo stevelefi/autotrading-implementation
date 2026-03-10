@@ -27,7 +27,7 @@ PERF_URL       = "http://localhost:18087"
 TOTAL_ORDERS   = 20
 BATCH_SIZE     = 4
 AGENT_ID       = "agent-load"        # agent_id sent in every ingress request
-AUTH_TOKEN     = "Bearer smoke-token"
+AUTH_TOKEN     = "Bearer smoke-api-key-local"  # seeded by smoke_local.py Phase 0 / onboard.py
 W              = 132                 # report width
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
