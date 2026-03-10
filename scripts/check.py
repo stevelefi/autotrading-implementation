@@ -109,6 +109,14 @@ def check_agent_sync() -> int:
 
 def check_unit() -> int:
     banner("Check 4/8: unit tests")
+    # Reinstall the contracts module before running tests to ensure the
+    # protobuf-generated classes in ~/.m2 match the reactor's compiled output.
+    # Without this, a prior clean resets target/ but leaves a stale snapshot
+    # in the local repo, causing NoSuchMethodError on synthetic accessor
+    # methods (e.g. CancelOrderRequest.access$N) in ibkr-connector tests.
+    rc = run("mvn", "-B", "-DskipTests", "install", "-pl", "libs/contracts")
+    if rc != 0:
+        return rc
     return run("mvn", "-B", "-DskipITs=true", "test")
 
 

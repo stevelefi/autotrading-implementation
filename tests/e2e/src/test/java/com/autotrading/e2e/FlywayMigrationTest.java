@@ -1,7 +1,5 @@
 package com.autotrading.e2e;
 
-import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 
@@ -10,6 +8,8 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
 
 class FlywayMigrationTest {
 
@@ -52,6 +52,16 @@ class FlywayMigrationTest {
              + "   AND column_name = 'next_retry_at'")) {
       rs.next();
       assertThat(rs.getInt(1)).isEqualTo(1);
+    }
+
+    // V9 added broker_health_status table
+    try (Connection conn = pg.getPostgresDatabase().getConnection();
+         ResultSet rs = conn.createStatement().executeQuery(
+             "SELECT COUNT(*) FROM information_schema.tables"
+             + " WHERE table_schema = 'public'"
+             + "   AND table_name = 'broker_health_status'")) {
+      rs.next();
+      assertThat(rs.getInt(1)).as("broker_health_status table should exist after V9 migration").isEqualTo(1);
     }
   }
 }

@@ -3,6 +3,7 @@ package com.autotrading.services.ibkr.client;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +26,28 @@ public class IbkrHealthProbe implements SmartLifecycle {
   private final IbkrRestClient restClient;
   private final long tickleIntervalMs;
   private final boolean simulatorMode;
+  private final Consumer<BrokerStatus> onTransition;
 
   private volatile BrokerStatus status = BrokerStatus.UNKNOWN;
   private ScheduledExecutorService scheduler;
 
+  /** Convenience constructor — no transition listener (used by tests). */
   public IbkrHealthProbe(IbkrRestClient restClient, long tickleIntervalMs, boolean simulatorMode) {
+    this(restClient, tickleIntervalMs, simulatorMode, ignored -> {});
+  }
+
+  /**
+   * Full constructor.
+   *
+   * @param onTransition called whenever {@link BrokerStatus} changes (UP→DOWN, DOWN→UP, etc.).
+   *                     Invoked on the probe scheduler thread; implementors must be non-blocking.
+   */
+  public IbkrHealthProbe(IbkrRestClient restClient, long tickleIntervalMs, boolean simulatorMode,
+                         Consumer<BrokerStatus> onTransition) {
     this.restClient = restClient;
     this.tickleIntervalMs = tickleIntervalMs;
     this.simulatorMode = simulatorMode;
+    this.onTransition = onTransition;
   }
 
   // ------------------------------------------------------------------
@@ -107,19 +122,39 @@ public class IbkrHealthProbe implements SmartLifecycle {
         status = BrokerStatus.UP;
         if (previous != BrokerStatus.UP) {
           log.info("IbkrHealthProbe broker UP (transition from {})", previous);
+          fireTransition(previous, status);
         }
       } else {
         status = BrokerStatus.DOWN;
         if (previous != BrokerStatus.DOWN) {
           log.warn("IbkrHealthProbe broker DOWN — tickle returned unauthenticated (previous={})", previous);
+          fireTransition(previous, status);
         }
       }
     } catch (Exception e) {
       BrokerStatus previous = status;
       status = BrokerStatus.DOWN;
       if (previous != BrokerStatus.DOWN) {
+        fireTransition(previous, status);
         log.warn("IbkrHealthProbe broker DOWN — tickle failed (previous={}): {}", previous, e.getMessage());
       }
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Private helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * Invokes the transition callback, swallowing any exception so that a misbehaving
+   * listener cannot disrupt the probe's own lifecycle.
+   */
+  private void fireTransition(BrokerStatus previous, BrokerStatus next) {
+    try {
+      onTransition.accept(next);
+    } catch (Exception ex) {
+      log.warn("IbkrHealthProbe transition callback failed from={} to={} cause={}",
+          previous, next, ex.getMessage());
     }
   }
 }

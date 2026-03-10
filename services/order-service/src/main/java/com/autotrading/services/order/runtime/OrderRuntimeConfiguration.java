@@ -5,9 +5,11 @@ import java.time.Clock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
+import com.autotrading.libs.health.BrokerHealthCache;
 import com.autotrading.libs.idempotency.IdempotencyService;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
@@ -50,13 +52,22 @@ public class OrderRuntimeConfiguration {
   }
 
   @Bean
+  BrokerHealthCache brokerHealthCache(
+      JdbcTemplate jdbcTemplate,
+      @Value("${broker.health.cache.refresh-interval-ms:10000}") long refreshIntervalMs) {
+    return new BrokerHealthCache(jdbcTemplate, refreshIntervalMs);
+  }
+
+  @Bean
   OrderSafetyEngine orderSafetyEngine(ReliabilityMetrics reliabilityMetrics, Clock clock,
                                        IdempotencyService idempotencyService,
                                        OrderIntentRepository orderIntentRepository,
                                        OrderLedgerRepository orderLedgerRepository,
-                                       OrderStateHistoryRepository orderStateHistoryRepository) {
+                                       OrderStateHistoryRepository orderStateHistoryRepository,
+                                       BrokerHealthCache brokerHealthCache) {
     return new OrderSafetyEngine(reliabilityMetrics, clock, idempotencyService,
-        orderIntentRepository, orderLedgerRepository, orderStateHistoryRepository);
+        orderIntentRepository, orderLedgerRepository, orderStateHistoryRepository,
+        brokerHealthCache::isBrokerAvailable);
   }
 
   @Bean

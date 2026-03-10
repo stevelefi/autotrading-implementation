@@ -4,6 +4,7 @@ import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.command.v1.CreateOrderIntentRequest;
 import com.autotrading.command.v1.Decision;
 import com.autotrading.command.v1.RequestContext;
+import com.autotrading.libs.health.BrokerHealthCache;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.core.OrderIntentState;
 import com.autotrading.services.order.core.OrderSafetyEngine;
@@ -24,15 +25,18 @@ public class OrderSmokeController {
   private final OrderSafetyEngine orderSafetyEngine;
   private final BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub;
   private final ReliabilityMetrics reliabilityMetrics;
+  private final BrokerHealthCache brokerHealthCache;
   private final Clock clock;
 
   public OrderSmokeController(OrderSafetyEngine orderSafetyEngine,
                               BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub,
                               ReliabilityMetrics reliabilityMetrics,
+                              BrokerHealthCache brokerHealthCache,
                               Clock clock) {
     this.orderSafetyEngine = orderSafetyEngine;
     this.brokerStub = brokerStub;
     this.reliabilityMetrics = reliabilityMetrics;
+    this.brokerHealthCache = brokerHealthCache;
     this.clock = clock;
   }
 

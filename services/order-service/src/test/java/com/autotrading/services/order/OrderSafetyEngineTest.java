@@ -1,6 +1,15 @@
 package com.autotrading.services.order;
 
+import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import static org.mockito.Mockito.mock;
 
 import com.autotrading.command.v1.BrokerCommandServiceGrpc;
 import com.autotrading.command.v1.CommandStatus;
@@ -9,27 +18,20 @@ import com.autotrading.command.v1.Decision;
 import com.autotrading.command.v1.RequestContext;
 import com.autotrading.command.v1.SubmitOrderRequest;
 import com.autotrading.command.v1.SubmitOrderResponse;
+import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
 import com.autotrading.libs.reliability.metrics.ReliabilityMetrics;
 import com.autotrading.services.order.core.OrderLifecycleState;
 import com.autotrading.services.order.core.OrderSafetyEngine;
 import com.autotrading.services.order.core.TradingMode;
+import com.autotrading.services.order.db.OrderIntentRepository;
+import com.autotrading.services.order.db.OrderLedgerRepository;
+import com.autotrading.services.order.db.OrderStateHistoryRepository;
+
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.concurrent.atomic.AtomicInteger;
-import static org.mockito.Mockito.mock;
-import com.autotrading.libs.idempotency.InMemoryIdempotencyService;
-import com.autotrading.services.order.db.OrderIntentRepository;
-import com.autotrading.services.order.db.OrderLedgerRepository;
-import com.autotrading.services.order.db.OrderStateHistoryRepository;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
 
 class OrderSafetyEngineTest {
   private Server server;
@@ -161,6 +163,30 @@ class OrderSafetyEngineTest {
     assertThat(accepted.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_ACCEPTED);
     assertThat(duplicate.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_DUPLICATE);
     assertThat(submitCount.get()).isEqualTo(1);
+  }
+
+  @Test
+  void brokerKnownDownReturnsFailed() throws IOException {
+    AtomicInteger submitCount = new AtomicInteger();
+    BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub brokerStub = startBroker(submitCount);
+
+    ReliabilityMetrics metrics = new ReliabilityMetrics();
+    Clock clock = Clock.fixed(Instant.parse("2026-03-06T00:00:00Z"), ZoneOffset.UTC);
+    // Pass () -> false to simulate broker health cache reporting DOWN
+    OrderSafetyEngine engine = new OrderSafetyEngine(metrics, clock,
+        new InMemoryIdempotencyService(),
+        mock(OrderIntentRepository.class),
+        mock(OrderLedgerRepository.class),
+        mock(OrderStateHistoryRepository.class),
+        () -> false);
+
+    var response = engine.createOrderIntent(baseRequest("idem-health-gate"), brokerStub);
+
+    assertThat(response.getStatus()).isEqualTo(CommandStatus.COMMAND_STATUS_FAILED);
+    assertThat(response.getReasonsList())
+        .anyMatch(r -> r.contains("broker known DOWN"));
+    // Idempotency key must NOT be consumed — caller must be able to retry with same key
+    assertThat(submitCount.get()).isZero();
   }
 
   private BrokerCommandServiceGrpc.BrokerCommandServiceBlockingStub startBroker(AtomicInteger submitCount) throws IOException {

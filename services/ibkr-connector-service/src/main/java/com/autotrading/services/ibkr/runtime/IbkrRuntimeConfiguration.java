@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import com.autotrading.libs.idempotency.IdempotencyService;
@@ -17,6 +18,7 @@ import com.autotrading.services.ibkr.core.BrokerConnectorEngine;
 import com.autotrading.services.ibkr.db.BrokerOrderRepository;
 import com.autotrading.services.ibkr.db.ExecutionRepository;
 import com.autotrading.services.ibkr.grpc.BrokerCommandGrpcService;
+import com.autotrading.services.ibkr.health.BrokerHealthPersister;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -51,9 +53,16 @@ public class IbkrRuntimeConfiguration {
   }
 
   @Bean
-  IbkrHealthProbe ibkrHealthProbe(IbkrRestClient ibkrRestClient) {
+  BrokerHealthPersister brokerHealthPersister(NamedParameterJdbcTemplate namedJdbc) {
+    return new BrokerHealthPersister(namedJdbc);
+  }
+
+  @Bean
+  IbkrHealthProbe ibkrHealthProbe(IbkrRestClient ibkrRestClient,
+                                   BrokerHealthPersister brokerHealthPersister) {
     boolean simulatorMode = "SIMULATOR".equalsIgnoreCase(ibkrMode);
-    return new IbkrHealthProbe(ibkrRestClient, tickleIntervalMs, simulatorMode);
+    return new IbkrHealthProbe(ibkrRestClient, tickleIntervalMs, simulatorMode,
+        brokerHealthPersister::onTransition);
   }
 
   @Bean

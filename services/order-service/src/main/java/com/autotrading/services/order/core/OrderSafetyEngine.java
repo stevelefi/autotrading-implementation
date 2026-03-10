@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BooleanSupplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,19 +42,34 @@ public class OrderSafetyEngine {
   private final List<String> alertEvents = new CopyOnWriteArrayList<>();
   private final ReliabilityMetrics metrics;
   private final Clock clock;
+  private final BooleanSupplier brokerHealthCheck;
   private volatile TradingMode tradingMode = TradingMode.NORMAL;
 
+  /** Test-friendly constructor — broker health always treated as available. */
   public OrderSafetyEngine(ReliabilityMetrics metrics, Clock clock,
                            IdempotencyService idempotencyService,
                            OrderIntentRepository orderIntentRepository,
                            OrderLedgerRepository orderLedgerRepository,
                            OrderStateHistoryRepository orderStateHistoryRepository) {
+    this(metrics, clock, idempotencyService,
+        orderIntentRepository, orderLedgerRepository, orderStateHistoryRepository,
+        () -> true);
+  }
+
+  /** Full constructor — supply {@code brokerHealthCache::isBrokerAvailable} in production. */
+  public OrderSafetyEngine(ReliabilityMetrics metrics, Clock clock,
+                           IdempotencyService idempotencyService,
+                           OrderIntentRepository orderIntentRepository,
+                           OrderLedgerRepository orderLedgerRepository,
+                           OrderStateHistoryRepository orderStateHistoryRepository,
+                           BooleanSupplier brokerHealthCheck) {
     this.metrics = metrics;
     this.clock = clock;
     this.idempotencyService = idempotencyService;
     this.orderIntentRepository = orderIntentRepository;
     this.orderLedgerRepository = orderLedgerRepository;
     this.orderStateHistoryRepository = orderStateHistoryRepository;
+    this.brokerHealthCheck = brokerHealthCheck;
   }
 
   public CreateOrderIntentResponse createOrderIntent(CreateOrderIntentRequest request,
@@ -71,6 +87,18 @@ public class OrderSafetyEngine {
           .setTraceId(request.getRequestContext().getTraceId())
           .setStatus(CommandStatus.COMMAND_STATUS_REJECTED)
           .addReasons("trading mode frozen")
+          .build();
+    }
+
+    // Proactive broker health gate — checked BEFORE the idempotency claim so the
+    // caller retains the right to retry with the same client_event_id after recovery.
+    if (!brokerHealthCheck.getAsBoolean()) {
+      log.warn("order-service rejecting createOrderIntent — broker known DOWN"
+          + " clientEventId={}", request.getRequestContext().getClientEventId());
+      return CreateOrderIntentResponse.newBuilder()
+          .setTraceId(request.getRequestContext().getTraceId())
+          .setStatus(CommandStatus.COMMAND_STATUS_FAILED)
+          .addReasons("broker known DOWN — retry when broker recovers")
           .build();
     }
 
