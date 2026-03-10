@@ -9,10 +9,11 @@ PostgreSQL persistence, and a full observability stack.
 | Language | Java 21 |
 | Framework | Spring Boot 3.3.5 |
 | Build | Maven multi-module — 12 modules — all `BUILD SUCCESS` |
-| E2E tests | 41 green (2026-03-09) |
-| Persistence | Spring Data JDBC + PostgreSQL 16 (9 Flyway migrations) |
+| E2E tests | 48 green (2026-03-10) |
+| Persistence | Spring Data JDBC + PostgreSQL 16 (10 Flyway migrations) |
 | Messaging | Kafka via Redpanda (local) |
 | RPC | gRPC 1.66.0 + Protobuf |
+| Auth | Bearer API-key authentication — `ApiKeyAuthenticator` (SHA-256, in-memory cache) |
 
 ---
 
@@ -24,12 +25,13 @@ PostgreSQL persistence, and a full observability stack.
 4. [Data Flow](#data-flow)
 5. [Kafka Topics](#kafka-topics)
 6. [Reliability Guarantees](#reliability-guarantees)
-7. [Database](#database)
-8. [Tracing and Observability](#tracing-and-observability)
-9. [Python Script Helpers](#python-script-helpers)
-10. [Quick Start](#quick-start)
-11. [Monorepo Layout](#monorepo-layout)
-12. [Contributor Instructions](#contributor-instructions)
+7. [Authentication and Account Model](#authentication-and-account-model)
+8. [Database](#database)
+9. [Tracing and Observability](#tracing-and-observability)
+10. [Python Script Helpers](#python-script-helpers)
+11. [Quick Start](#quick-start)
+12. [Monorepo Layout](#monorepo-layout)
+13. [Contributor Instructions](#contributor-instructions)
 
 ---
 
@@ -37,17 +39,25 @@ PostgreSQL persistence, and a full observability stack.
 
 ```
 External / Trader UI
-        |  HTTP POST /api/v1/trade-events
+        |  HTTP POST /ingress/v1/events
+        |  Authorization: Bearer <api-key>
         v
-  ingress-gateway-service  --kafka-->  ingress.events.normalized.v1
-        |
+  ingress-gateway-service
+    ├─ ApiKeyAuthenticator (Bearer token → account_id, 401/403 if invalid)
+    ├─ BrokerHealthCache   (circuit-breaker, rejects when broker DOWN → 503)
+    └─ idempotency claim   (client_event_id dedup)
+        |  ingress.events.normalized.v1  (Kafka)
   event-processor-service  --kafka-->  trade.events.routed.v1
         |
   agent-runtime-service  --gRPC-->  risk-service :19091
                                           |
                                     gRPC -->  order-service :19092
+                                              ├─ BrokerHealthCache (second gate)
+                                              └─ 60s timeout watchdog → FROZEN
                                                     |
                                             gRPC -->  ibkr-connector-service :19093
+                                                        ├─ BrokerAccountCache (agent → account routing)
+                                                        └─ IbkrHealthProbe (tickle every 30s)
                                                             |
                                                     fills.executed.v1  (Kafka)
                                                             |
@@ -131,10 +141,53 @@ Key design decisions:
 - **Two Kafka hops then synchronous gRPC** — hot path latency ~112 ms total
 - **Persist-before-gRPC** — agent-runtime saves the signal to DB *before* calling risk,
   so a crash before the response is safe to replay
+- **Bearer API key auth** — `ApiKeyAuthenticator` validates every ingress request; 400 for
+  missing/non-Bearer header, 401 for unknown key, 403 if the agent doesn't belong to the caller's account
 - **Broker health gate** — ingress-gateway and order-service both check `BrokerHealthCache`
   before forwarding; new orders are rejected when the broker is `DOWN`
+- **Agent → account routing** — `BrokerAccountCache` resolves each `agent_id` to its IBKR
+  external account ID, enabling multi-account sub-account routing at the connector layer
 - **60 s watchdog** — `OrderTimeoutWatchdogLifecycle` polls every 5 s; if no ack within 60 s
   it sets `tradingMode = FROZEN` and publishes a `CRITICAL` alert on `system.alerts.v1`
+
+---
+
+## Authentication and Account Model
+
+Full guide: **[docs/AUTH_AND_ACCOUNT_MODEL.md](docs/AUTH_AND_ACCOUNT_MODEL.md)**
+
+All ingress requests require a `Bearer` API key. The lifecycle is:
+
+```
+HTTP Authorization: Bearer <raw-key>
+    │
+    ▼  SHA-256(raw-key)  →  look up in ApiKeyAuthenticator cache
+    ├─ no header / non-Bearer       → 400 Bad Request
+    ├─ unknown hash                 → 401 Unauthorized
+    ├─ agent_id not in account      → 403 Forbidden
+    └─ valid                        → principal_id = accountId, principal_json stored on event
+```
+
+### SmartLifecycle Phase Order
+
+| Phase | Component | Role |
+|-------|-----------|------|
+| 40 | `ApiKeyAuthenticator` | Loads `account_api_keys` + agent ownership → in-memory SHA-256 cache |
+| 40 | `BrokerAccountCache` | Loads `broker_accounts` → `agentId → externalAccountId` map |
+| 50 | `BrokerHealthCache` | Polls `broker_health_status` → `brokerAvailable` boolean |
+| 100 | `IbkrHealthProbe` | Runs `GET /tickle` → writes transitions to `broker_health_status` |
+| 200+ | Tomcat / gRPC server | Begins accepting traffic — all caches already warm |
+
+### Account data model (V10)
+
+```
+accounts (account_id PK)
+    └── agents (agent_id PK, account_id FK)
+    └── account_api_keys (key_hash PK, account_id FK)   -- many keys per account (rotation)
+    └── broker_accounts (broker_account_id PK, agent_id UNIQUE FK) -- one broker acct per agent
+```
+
+Seed the local dev database or use `scripts/onboard.py` to manage accounts and keys.
 
 ---
 
@@ -216,13 +269,14 @@ All publishing uses `DirectKafkaPublisher` with doubling back-off (max 5 s budge
 | Persist-before-gRPC safety | Signal saved before `riskStub.evaluateSignal()` |
 | Crash-safe kill-switch | `system_controls` restored on `MonitoringController` startup |
 | Broker health gate | `BrokerHealthCache` checked by ingress + order before connector call |
-| Broker health persistence | `BrokerHealthPersister` writes UP/DOWN transitions to `broker_health_status` |
-
+| Broker health persistence | `BrokerHealthPersister` writes UP/DOWN transitions to `broker_health_status` || API key authentication | `ApiKeyAuthenticator` (phase 40) — in-memory SHA-256 cache, 60 s refresh, survives DB blips |
+| Agent ownership enforcement | `isAgentOwnedBy()` check in `IngressService` — 403 on cross-account agent use |
+| Per-agent broker routing | `BrokerAccountCache` (phase 40) — maps `agent_id` → IBKR external account ID |
 ---
 
 ## Database
 
-PostgreSQL 16 (`autotrading` database). Schema managed by Flyway — 9 migrations:
+PostgreSQL 16 (`autotrading` database). Schema managed by Flyway — 10 migrations:
 
 | Migration | What it adds |
 |-----------|-------------|
@@ -235,6 +289,7 @@ PostgreSQL 16 (`autotrading` database). Schema managed by Flyway — 9 migration
 | V7 | Convert `jsonb` columns to `TEXT` (Spring Data JDBC Rule 2) |
 | V8 | Rename `idempotency_key` -> `client_event_id`; `ingress_event_id` -> `event_id` |
 | V9 | `broker_health_status` — shared broker health state; seed row `broker_id='ibkr'` |
+| V10 | `accounts`, `agents`, `account_api_keys`, `broker_accounts` — account/auth model; dev seed row |
 
 Full schema: [db/migrations/](db/migrations/)
 
@@ -242,14 +297,15 @@ Full schema: [db/migrations/](db/migrations/)
 
 | Service | Tables |
 |---------|--------|
-| ingress-gateway | `idempotency_records`, `ingress_raw_events`, `outbox_events` |
+| ingress-gateway | `idempotency_records`, `ingress_raw_events`, `outbox_events`, `account_api_keys` (R), `accounts` (R), `agents` (R) |
 | event-processor | `consumer_inbox`, `routed_trade_events` |
 | agent-runtime | `consumer_inbox`, `signals` |
 | risk-service | `risk_decisions`, `risk_events`, `policy_decision_log` |
 | order-service | `idempotency_records`, `order_intents`, `order_ledger`, `order_state_history`, `system_controls` |
-| ibkr-connector | `idempotency_records`, `broker_orders`, `executions`, `broker_health_status` (R+W) |
+| ibkr-connector | `idempotency_records`, `broker_orders`, `executions`, `broker_health_status` (R+W), `broker_accounts` (R) |
 | performance | `positions`, `pnl_snapshots`, `executions` (R) |
 | monitoring-api | `system_controls` (R), `reconciliation_runs` |
+| _(shared auth)_ | `accounts`, `agents`, `account_api_keys`, `broker_accounts` — owned by no single service; seeded via `scripts/onboard.py` |
 
 ---
 
@@ -277,7 +333,7 @@ All 8 services emit these fields in every log line. Each is a first-class Loki f
 | `trace_id` | One end-to-end request through the full stack. Auto-generated by the OTel Java agent; consistent across all service hops for one attempt. New value on every retry. |
 | `request_id` | Originating `X-Request-Id` HTTP header or Kafka event ID. |
 | `client_event_id` | Caller-supplied dedup key. Same key = same logical business request, even across retries. Unlike `trace_id`, a retried call shares the same `client_event_id` but gets a new `trace_id`. |
-| `principal_id` | Actor who originated the trade (`X-Actor-Id` header). |
+| `principal_id` | Authenticated account ID (`accountId` from `ApiKeyAuthenticator`). Populated after V10 auth wiring; was `"anonymous"` before. |
 | `agent_id` | Trading agent driving this signal and order. |
 | `signal_id` | Links agent-runtime logs -> risk-service logs for one decision. |
 | `order_intent_id` | Links risk -> order-service -> ibkr-connector logs for one order lifecycle. |
@@ -368,21 +424,25 @@ python3 scripts/stack.py down            # end of session
 
 ---
 
-### `scripts/smoke_local.py` — 5-Phase Smoke Suite
+### `scripts/smoke_local.py` — 6-Phase Smoke Suite
 
 Runs against the live stack (requires `stack.py up` first). Any phase failure exits non-zero.
 
 ```bash
 python3 scripts/smoke_local.py
+# or via the master runner:
+python3 scripts/test.py smoke
 ```
 
 | Phase | What it validates |
 |-------|-------------------|
+| 0 — Auth DB seed | Seeds `accounts`, `agents`, `account_api_keys`, `broker_accounts` fixtures; waits for auth cache to warm |
 | 1 — Readiness | All 8 services return `{"status":"UP"}` (360 s timeout) |
-| 2 — Ingress idempotency | Duplicate `client_event_id` -> 202 with same `event_id`; conflicting payload on same key -> 202 replaying original |
+| 2 — Ingress idempotency | Duplicate `client_event_id` -> 202 with same `event_id`; conflicting payload -> 202 replaying original |
 | 3 — Command path | Risk -> Order -> IBKR; two identical risk calls produce exactly one broker submit |
 | 4 — Timeout freeze drill | 60 s watchdog triggers `trading_mode=FROZEN`; alert present on `system.alerts.v1` |
 | 5 — Async Kafka pipeline | End-to-end: ingress POST -> broker `total_submit_count` increments within 90 s |
+| 6 — Auth edge cases | Missing header → 400; non-Bearer → 400; unknown key → 401; cross-account agent → 403; valid → 202 |
 
 Reports written to:
 - `reports/blitz/e2e-results/smoke-local-<timestamp>.md` — human-readable pass/fail
@@ -414,15 +474,71 @@ python3 scripts/check.py --only unit coverage  # run specific checks by name
 
 ---
 
-### `scripts/test.py` — Maven Test Runner
+### `scripts/test.py` — Master Test Runner
+
+Single entry point for every test type — Maven suites, live smoke, load test, and manual trace.
 
 ```bash
-python3 scripts/test.py unit                                  # all unit tests (all modules)
-python3 scripts/test.py unit --module services/risk-service   # single module only
+# No live stack required
+python3 scripts/test.py unit                                  # all unit tests
+python3 scripts/test.py unit --module services/risk-service   # single module
 python3 scripts/test.py coverage                              # JaCoCo gate on 5 core modules
 python3 scripts/test.py e2e                                   # all 5 e2e test classes
 python3 scripts/test.py all                                   # unit + coverage + e2e (fail fast)
-python3 scripts/test.py all --no-fail-fast                    # run all even if one fails
+python3 scripts/test.py all --no-fail-fast
+
+# Requires live stack (python3 scripts/stack.py up first)
+python3 scripts/test.py smoke                                 # 6-phase integration smoke suite
+python3 scripts/test.py load                                  # 20-order concurrent load test
+python3 scripts/test.py manual                                # single-event trace (defaults)
+python3 scripts/test.py manual -- --agent-id my-agent --qty 5 --side SELL
+
+# Full CI equivalent (stack must be up for the smoke phase)
+python3 scripts/test.py full                                  # unit + coverage + e2e + smoke
+```
+
+---
+
+### `scripts/onboard.py` — Account / Agent / API-key / Broker CLI
+
+Manages the V10 auth tables directly in the local Postgres container.
+
+```bash
+# Accounts
+python3 scripts/onboard.py account create acc-my-firm "My Firm"
+python3 scripts/onboard.py account list
+
+# Agents
+python3 scripts/onboard.py agent create agent-alpha acc-my-firm "Alpha Strategy"
+python3 scripts/onboard.py agent list acc-my-firm
+
+# API keys
+python3 scripts/onboard.py apikey generate acc-my-firm           # random key, shown once
+python3 scripts/onboard.py apikey create acc-my-firm <raw-key>   # register a known key
+python3 scripts/onboard.py apikey list   acc-my-firm
+python3 scripts/onboard.py apikey revoke <sha256-hash>
+
+# Broker account mapping
+python3 scripts/onboard.py broker create agent-alpha DU123456
+python3 scripts/onboard.py broker list
+```
+
+The smoke suite seeds its own test fixtures in Phase 0 (`seed_smoke_auth_db()`), so `onboard.py`
+is mainly for manual dev or staging setup.
+
+---
+
+### `scripts/manual_trace.py` — Single-Event End-to-End Trace
+
+Sends one ingress event, captures the OTel trace ID, tails Loki, polls the IBKR pipeline,
+and opens Grafana Tempo links.
+
+```bash
+python3 scripts/manual_trace.py                                # defaults
+python3 scripts/manual_trace.py --agent-id my-agent --qty 5 --side SELL
+python3 scripts/manual_trace.py --token my-raw-key --skip-loki --no-browser
+# or via master runner:
+python3 scripts/test.py manual -- --agent-id my-agent --qty 5
 ```
 
 ---
@@ -573,7 +689,7 @@ services/
   performance-service/       P&L + position tracking
   monitoring-api/            Control plane (trading-mode, kill-switch, SSE)
 
-db/migrations/        Flyway V1-V9 SQL migrations (21 tables)
+db/migrations/        Flyway V1-V10 SQL migrations (25 tables + auth model)
 infra/local/          Docker Compose + env templates
 infra/observability/  OTel Collector, Prometheus, Loki, Grafana, Tempo configs
 infra/helm/           trading-service Helm chart
@@ -595,6 +711,8 @@ tools/                spec_sync.py
 | Monitoring UIs, Loki LogQL, trace.py, alert runbooks, DB inspection | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) |
 | Blitz change control and AI agent guardrails | [AGENTS.md](AGENTS.md) |
 | Reliability drill runbooks | [docs/runbooks/reliability-drills.md](docs/runbooks/reliability-drills.md) |
+| Account model, API key auth, BrokerAccountCache, onboard.py | [docs/AUTH_AND_ACCOUNT_MODEL.md](docs/AUTH_AND_ACCOUNT_MODEL.md) |
+| Broker health circuit breaker, BrokerHealthCache, SmartLifecycle phases | [docs/BROKER_HEALTH_CIRCUIT_BREAKER.md](docs/BROKER_HEALTH_CIRCUIT_BREAKER.md) |
 
 ### Slack Agent Status
 

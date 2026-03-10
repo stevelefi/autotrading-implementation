@@ -4,6 +4,27 @@ This document describes how the system detects whether the IBKR broker is availa
 state is persisted and cached, and how ingress-gateway and order-service use it to gate order
 acceptance.
 
+For the companion auth components that start *before* `BrokerHealthCache`, see
+**[AUTH_AND_ACCOUNT_MODEL.md](AUTH_AND_ACCOUNT_MODEL.md)**.
+
+---
+
+## SmartLifecycle Phase Context
+
+The table below shows the full startup order for all `SmartLifecycle` components. Request traffic
+cannot reach any service until Tomcat/gRPC (phase 200+) starts, by which time all caches are warm.
+
+| Phase | Component | Role |
+|-------|-----------|------|
+| 40 | `ApiKeyAuthenticator` | Loads `account_api_keys` → SHA-256 in-memory auth cache |
+| 40 | `BrokerAccountCache` | Loads `broker_accounts` → `agentId → externalAccountId` map |
+| **50** | **`BrokerHealthCache`** | **Polls `broker_health_status` → `brokerAvailable` boolean** ← this doc |
+| 100 | `IbkrHealthProbe` | Runs `GET /v1/api/tickle` → writes transitions to `broker_health_status` |
+| 200+ | Tomcat / gRPC server | Begins accepting traffic |
+
+The `ApiKeyAuthenticator` and `BrokerAccountCache` at phase 40 ensure that authentication and
+broker-account routing caches are populated before the broker health cache starts at phase 50.
+
 ---
 
 ## Overview
