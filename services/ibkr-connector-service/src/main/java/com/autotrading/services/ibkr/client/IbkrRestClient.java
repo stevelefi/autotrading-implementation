@@ -1,6 +1,7 @@
 package com.autotrading.services.ibkr.client;
 
 import java.util.List;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,14 +23,25 @@ public class IbkrRestClient {
   private static final Logger log = LoggerFactory.getLogger(IbkrRestClient.class);
 
   private final RestClient restClient;
-  private final String accountId;
+  private final Function<String, String> accountResolver;
 
-  public IbkrRestClient(String baseUrl, String accountId) {
+  /**
+   * Primary constructor — uses a {@link Function} to resolve the IBKR account ID from an
+   * agent ID at call time, enabling per-agent sub-account routing.
+   */
+  public IbkrRestClient(String baseUrl, Function<String, String> accountResolver) {
     this.restClient = RestClient.builder()
         .baseUrl(baseUrl)
         .defaultHeader("User-Agent", "autotrading-ibkr-connector/1.0")
         .build();
-    this.accountId = accountId;
+    this.accountResolver = accountResolver;
+  }
+
+  /**
+   * Convenience constructor for tests and legacy code — uses a fixed account ID.
+   */
+  public IbkrRestClient(String baseUrl, String accountId) {
+    this(baseUrl, ignored -> accountId);
   }
 
   // ------------------------------------------------------------------
@@ -53,12 +65,14 @@ public class IbkrRestClient {
   /**
    * {@code POST /v1/api/iserver/order/{accountId}} — submits a new order.
    *
+   * @param agentId   the trading agent ID used to resolve the IBKR sub-account
    * @return list of order-status entries (IBKR returns an array)
    */
   @SuppressWarnings("unchecked")
-  public List<IbkrOrderStatus> submitOrder(String conid, String side, int quantity,
+  public List<IbkrOrderStatus> submitOrder(String agentId, String conid, String side, int quantity,
                                             String orderType, String tif,
                                             String instrumentId, String orderRef) {
+    String resolvedAccount = accountResolver.apply(agentId);
     var body = new java.util.HashMap<String, Object>();
     body.put("conid", conid);
     body.put("side", side);
@@ -70,9 +84,9 @@ public class IbkrRestClient {
       body.put("cOID", orderRef);
     }
 
-    log.debug("ibkr submitOrder accountId={} side={} qty={} orderType={}", accountId, side, quantity, orderType);
+    log.debug("ibkr submitOrder accountId={} side={} qty={} orderType={}", resolvedAccount, side, quantity, orderType);
     return restClient.post()
-        .uri("/v1/api/iserver/order/{accountId}", accountId)
+        .uri("/v1/api/iserver/order/{accountId}", resolvedAccount)
         .body(body)
         .retrieve()
         .body(new org.springframework.core.ParameterizedTypeReference<List<IbkrOrderStatus>>() {});

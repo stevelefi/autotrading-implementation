@@ -63,5 +63,25 @@ class FlywayMigrationTest {
       rs.next();
       assertThat(rs.getInt(1)).as("broker_health_status table should exist after V9 migration").isEqualTo(1);
     }
+
+    // V10 added accounts, agents, account_api_keys, broker_accounts tables
+    for (String table : new String[]{"accounts", "agents", "account_api_keys", "broker_accounts"}) {
+      try (Connection conn = pg.getPostgresDatabase().getConnection();
+           ResultSet rs = conn.createStatement().executeQuery(
+               "SELECT COUNT(*) FROM information_schema.tables"
+               + " WHERE table_schema = 'public'"
+               + "   AND table_name = '" + table + "'")) {
+        rs.next();
+        assertThat(rs.getInt(1)).as(table + " table should exist after V10 migration").isEqualTo(1);
+      }
+    }
+
+    // V10 dev seed: acc-local-dev account row should exist
+    try (Connection conn = pg.getPostgresDatabase().getConnection();
+         ResultSet rs = conn.createStatement().executeQuery(
+             "SELECT COUNT(*) FROM accounts WHERE account_id = 'acc-local-dev'")) {
+      rs.next();
+      assertThat(rs.getInt(1)).as("V10 dev seed account should exist").isEqualTo(1);
+    }
   }
 }

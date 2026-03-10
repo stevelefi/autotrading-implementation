@@ -107,7 +107,7 @@ python3 scripts/stack.py logs          # tail all service logs
 
 ### Smoke suite — what "PASS" means
 
-`scripts/smoke_local.py` runs 5 phases sequentially; any failure exits non-zero:
+`scripts/smoke_local.py` runs 6 phases sequentially; any failure exits non-zero:
 
 | Phase | What it checks |
 |-------|---------------|
@@ -116,6 +116,7 @@ python3 scripts/stack.py logs          # tail all service logs
 | 3 — Command path | Risk → Order → IBKR; two identical risk calls produce exactly one broker submit (dedup) |
 | 4 — Timeout freeze drill | 60 s watchdog triggers `trading_mode=FROZEN`, alert present on `system.alerts.v1` |
 | 5 — Async Kafka pipeline | End-to-end ingress POST → broker `total_submit_count` increments within 90 s |
+| 6 — Auth edge cases | Missing header → 400; non-Bearer scheme → 400; unknown key → 401; cross-account agent → 403; valid key + owned agent → 202 |
 
 Smoke writes results to:
 - `reports/blitz/e2e-results/smoke-local-<timestamp>.md` — human-readable pass/fail summary
@@ -157,11 +158,12 @@ python3 scripts/stack.py down
 | Script | Purpose | Key commands |
 |--------|---------|-------------|
 | `scripts/branch_check.py` | GitHub flow branch name validator | *(no args)* checks current branch; `<name>` checks a specific name |
+| `scripts/onboard.py` | Account / agent / API-key / broker-account management CLI | `account create/list`, `agent create/list`, `apikey generate/create/list/revoke`, `broker create/list` |
 | `scripts/pr.py` | Safe branch + commit + push + GitHub PR (no shell-quoting issues) | `--branch NAME --title TEXT [--body TEXT] [--draft] [--commit-only] [--push-only]` |
-| `scripts/test.py` | Maven test runner | `unit` \| `coverage` \| `e2e` \| `all` — add `--module <path>` to target one module |
+| `scripts/test.py` | Master test runner | `unit` \| `coverage` \| `e2e` \| `smoke` \| `load` \| `manual` \| `all` \| `full` — add `--module <path>` to target one module; `full` = unit+coverage+e2e+smoke |
 | `scripts/check.py` | Pre-commit gate (all checks + summary) | *(no args)* full gate; `--fast` skips e2e; `--skip-helm` skips Helm; `--only <check>...` |
 | `scripts/stack.py` | Local stack manager | `up` \| `down` \| `infra-up` \| `app-up` \| `app-down` \| `restart-app` \| `build` \| `status` \| `logs` \| `validate` \| `ci` |
-| `scripts/smoke_local.py` | 5-phase smoke suite (requires stack up) | *(no args)* — writes reports to `reports/blitz/` |
+| `scripts/smoke_local.py` | 6-phase smoke suite (requires stack up) | *(no args)* — writes reports to `reports/blitz/` |
 | `scripts/trace.py` | Query Loki logs by MDC field | `--trace-id` \| `--client-event-id` \| `--agent-id` \| `--order-intent-id` \| `--signal-id` \| `--service` \| `--since` |
 
 ---

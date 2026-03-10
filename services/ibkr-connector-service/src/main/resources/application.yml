@@ -67,6 +67,11 @@ ibkr:
     tickle-interval-ms: ${IBKR_CP_TICKLE_INTERVAL_MS:30000}
     poll-interval-ms: ${IBKR_CP_POLL_INTERVAL_MS:5000}
 
+broker:
+  account:
+    cache:
+      refresh-interval-ms: ${BROKER_ACCOUNT_CACHE_REFRESH_INTERVAL_MS:60000}
+
 logging:
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} level=%5p service=${spring.application.name} trace_id=%X{trace_id:-} request_id=%X{request_id:-} client_event_id=%X{client_event_id:-} principal_id=%X{principal_id:-} agent_id=%X{agent_id:-} signal_id=%X{signal_id:-} order_intent_id=%X{order_intent_id:-} instrument_id=%X{instrument_id:-} [%thread] %logger - %msg%n"

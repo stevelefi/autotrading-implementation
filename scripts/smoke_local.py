@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import hashlib
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -75,6 +77,247 @@ def wait_for_readiness(name: str, base_url: str, timeout_sec: int = 360) -> None
 def ensure(condition: bool, message: str) -> None:
     if not condition:
         raise RuntimeError(message)
+
+
+# ---------------------------------------------------------------------------
+# Smoke auth constants
+# ---------------------------------------------------------------------------
+
+SMOKE_RAW_KEY      = "smoke-api-key-local"
+SMOKE_ACCOUNT_ID   = "acc-smoke"
+SMOKE_AGENT_ID     = "agent-smoke"
+SMOKE_PIPELINE_AGENT = "agent-smoke-pipeline"
+SMOKE_LOAD_AGENT   = "agent-load"
+OTHER_ACCOUNT_ID   = "acc-other-smoke"
+OTHER_AGENT_ID     = "agent-other-smoke"
+
+
+def _sha256_hex(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _psql(sql: str) -> None:
+    """
+    Execute a SQL statement via docker exec in the local postgres container.
+    Tolerates missing container (stack not up) by printing a warning.
+    """
+    container = os.getenv("POSTGRES_CONTAINER", "autotrading-local-postgres-1")
+    db_user   = os.getenv("POSTGRES_USER",      "autotrading")
+    db_pass   = os.getenv("POSTGRES_PASSWORD",  "autotrading_dev_only")
+    db_name   = os.getenv("POSTGRES_DB",        "autotrading")
+    result = subprocess.run(
+        ["docker", "exec", "-i", container,
+         "psql", "-U", db_user, "-d", db_name, "-c", sql],
+        capture_output=True, text=True,
+        env={**os.environ, "PGPASSWORD": db_pass},
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"psql error: {result.stderr.strip()}")
+
+
+def seed_smoke_auth_db() -> None:
+    """
+    Phase 0 — Seed the V10 auth tables with smoke-test fixtures.
+    All inserts are idempotent (ON CONFLICT DO NOTHING / DO UPDATE).
+    """
+    key_hash = _sha256_hex(SMOKE_RAW_KEY)
+
+    rows = [
+        # accounts
+        (f"INSERT INTO accounts (account_id, display_name, active, created_at) VALUES "
+         f"('{SMOKE_ACCOUNT_ID}','Smoke Test Account',TRUE,now()) ON CONFLICT DO NOTHING"),
+        (f"INSERT INTO accounts (account_id, display_name, active, created_at) VALUES "
+         f"('{OTHER_ACCOUNT_ID}','Other Smoke Account',TRUE,now()) ON CONFLICT DO NOTHING"),
+        # agents — main smoke account
+        (f"INSERT INTO agents (agent_id, account_id, display_name, active, created_at) VALUES "
+         f"('{SMOKE_AGENT_ID}','{SMOKE_ACCOUNT_ID}','Smoke Agent',TRUE,now()) ON CONFLICT DO NOTHING"),
+        (f"INSERT INTO agents (agent_id, account_id, display_name, active, created_at) VALUES "
+         f"('{SMOKE_PIPELINE_AGENT}','{SMOKE_ACCOUNT_ID}','Smoke Pipeline Agent',TRUE,now()) ON CONFLICT DO NOTHING"),
+        (f"INSERT INTO agents (agent_id, account_id, display_name, active, created_at) VALUES "
+         f"('{SMOKE_LOAD_AGENT}','{SMOKE_ACCOUNT_ID}','Smoke Load Agent',TRUE,now()) ON CONFLICT DO NOTHING"),
+        # agent owned by the OTHER account (used to test 403)
+        (f"INSERT INTO agents (agent_id, account_id, display_name, active, created_at) VALUES "
+         f"('{OTHER_AGENT_ID}','{OTHER_ACCOUNT_ID}','Other Account Agent',TRUE,now()) ON CONFLICT DO NOTHING"),
+        # api key for the main smoke account
+        (f"INSERT INTO account_api_keys (key_hash, account_id, generation, active, created_at) VALUES "
+         f"('{key_hash}','{SMOKE_ACCOUNT_ID}',1,TRUE,now()) ON CONFLICT DO NOTHING"),
+        # broker accounts
+        ("INSERT INTO broker_accounts (broker_account_id, agent_id, broker_id, external_account_id, active, created_at) VALUES "
+         f"('ba-smoke','{SMOKE_AGENT_ID}','ibkr','DU000001',TRUE,now()) "
+         "ON CONFLICT (agent_id) DO UPDATE SET external_account_id=EXCLUDED.external_account_id, active=TRUE"),
+        ("INSERT INTO broker_accounts (broker_account_id, agent_id, broker_id, external_account_id, active, created_at) VALUES "
+         f"('ba-smoke-pipeline','{SMOKE_PIPELINE_AGENT}','ibkr','DU000002',TRUE,now()) "
+         "ON CONFLICT (agent_id) DO UPDATE SET external_account_id=EXCLUDED.external_account_id, active=TRUE"),
+        ("INSERT INTO broker_accounts (broker_account_id, agent_id, broker_id, external_account_id, active, created_at) VALUES "
+         f"('ba-smoke-load','{SMOKE_LOAD_AGENT}','ibkr','DU000003',TRUE,now()) "
+         "ON CONFLICT (agent_id) DO UPDATE SET external_account_id=EXCLUDED.external_account_id, active=TRUE"),
+    ]
+    for sql in rows:
+        _psql(sql)
+
+
+def wait_for_auth_ready(ingress_url: str, timeout_sec: int = 90) -> None:
+    """
+    Called immediately after seed_smoke_auth_db().
+
+    Step 1 — wiring probe:
+      Send a one-time request with a deliberately unknown key.
+      If ingress returns 202  → auth is NOT wired (stack running old code).
+        Raise immediately with a clear "restart-app" hint.
+      If ingress returns 401  → auth is wired, proceed to step 2.
+      Any other status is also treated as "auth not wired" and raises.
+
+    Step 2 — cache warmup poll:
+      The ApiKeyAuthenticator cache loaded at app startup *before* Phase 0
+      seeded the smoke fixtures.  Poll until the smoke key is accepted
+      (returns 202) so that phases 2–6 all use a warm cache.
+      Timeout after timeout_sec with a descriptive error.
+    """
+    probe_payload = {
+        "client_event_id": f"smoke-auth-probe-{utc_ts()}",
+        "event_intent":    "TRADE_SIGNAL",
+        "agent_id":        SMOKE_AGENT_ID,
+        "payload":         {"side": "BUY", "qty": 1},
+    }
+    probe_headers = {
+        "Authorization": "Bearer smoke-auth-probe-detect-wiring-xyz",
+        "X-Request-Id":  "smoke-auth-probe-detect",
+    }
+
+    print("  [auth probe] checking auth is wired in running stack ...", flush=True)
+    r = http_json("POST", f"{ingress_url}/ingress/v1/events", probe_payload, probe_headers)
+    if r.status != 401:
+        raise RuntimeError(
+            f"Auth is NOT wired in the running stack "
+            f"(probe with unknown key returned {r.status}, expected 401). "
+            f"Run:  python3 scripts/stack.py restart-app"
+        )
+    print("  [auth probe] auth wired ✓ (unknown key → 401)", flush=True)
+
+    # Step 2 — wait for smoke key to appear in the auth cache
+    warmup_payload = {
+        "client_event_id": f"smoke-auth-warmup-{utc_ts()}",
+        "event_intent":    "TRADE_SIGNAL",
+        "agent_id":        SMOKE_AGENT_ID,
+        "payload":         {"side": "BUY", "qty": 1},
+    }
+    warmup_headers = {
+        "Authorization": f"Bearer {SMOKE_RAW_KEY}",
+        "X-Request-Id":  "smoke-auth-warmup",
+    }
+
+    end = time.time() + timeout_sec
+    print("  [auth probe] waiting for smoke key to appear in auth cache ...", flush=True)
+    while time.time() < end:
+        r = http_json("POST", f"{ingress_url}/ingress/v1/events", warmup_payload, warmup_headers)
+        if r.status == 202:
+            print("  [auth probe] auth cache warm ✓ (smoke key accepted → 202)", flush=True)
+            return
+        if r.status == 401:
+            elapsed = int(timeout_sec - (end - time.time()))
+            print(f"  [auth probe] cache not yet refreshed "
+                  f"({elapsed}s elapsed) — retrying in 3s ...", flush=True)
+            time.sleep(3)
+            # rotate the idempotency key so the next attempt is not a replay
+            warmup_payload["client_event_id"] = f"smoke-auth-warmup-{utc_ts()}"
+        else:
+            raise RuntimeError(
+                f"Unexpected status {r.status} during auth cache warmup "
+                f"(body: {r.body_text[:200]})"
+            )
+    raise RuntimeError(
+        f"Auth cache warmup timed out after {timeout_sec}s — "
+        f"smoke key '{SMOKE_RAW_KEY}' was never accepted by the running service."
+    )
+
+
+def phase_six_auth_checks(ingress_url: str, details: dict) -> list[str]:
+    """
+    Phase 6 — Auth edge-case checks:
+      (a) missing Authorization header          → 400
+      (b) non-Bearer Authorization header       → 400
+      (c) unknown / revoked API key             → 401
+      (d) valid key but agent from other acct   → 403
+      (e) valid key + owned agent               → 202
+    """
+    print("\n=== Phase 6: auth edge-case checks ===", flush=True)
+
+    valid_payload = {
+        "client_event_id": f"smoke-auth-{utc_ts()}-ok",
+        "event_intent":    "TRADE_SIGNAL",
+        "agent_id":        SMOKE_AGENT_ID,
+        "payload":         {"side": "BUY", "qty": 1},
+    }
+    valid_headers = {"Authorization": f"Bearer {SMOKE_RAW_KEY}",
+                     "X-Request-Id":  "smoke-auth-ok"}
+
+    # (a) no Authorization header at all → 400
+    r_no_header = http_json(
+        "POST", f"{ingress_url}/ingress/v1/events",
+        {**valid_payload, "client_event_id": f"smoke-auth-{utc_ts()}-noauth"},
+        {"X-Request-Id": "smoke-auth-noheader"},
+    )
+    ensure(r_no_header.status == 400,
+           f"(a) missing auth header: expected 400 got {r_no_header.status}")
+    print("  (a) missing Authorization header → 400 ✓", flush=True)
+
+    # (b) wrong auth scheme (not Bearer) → 400
+    r_bad_scheme = http_json(
+        "POST", f"{ingress_url}/ingress/v1/events",
+        {**valid_payload, "client_event_id": f"smoke-auth-{utc_ts()}-scheme"},
+        {"Authorization": "Basic dXNlcjpwYXNz", "X-Request-Id": "smoke-auth-scheme"},
+    )
+    ensure(r_bad_scheme.status == 400,
+           f"(b) bad auth scheme: expected 400 got {r_bad_scheme.status}")
+    print("  (b) non-Bearer Authorization header → 400 ✓", flush=True)
+
+    # (c) unknown / garbage key → 401
+    r_unknown = http_json(
+        "POST", f"{ingress_url}/ingress/v1/events",
+        {**valid_payload, "client_event_id": f"smoke-auth-{utc_ts()}-unknown"},
+        {"Authorization": "Bearer totally-unknown-key-xyz",
+         "X-Request-Id": "smoke-auth-unknown"},
+    )
+    ensure(r_unknown.status == 401,
+           f"(c) unknown key: expected 401 got {r_unknown.status}")
+    print("  (c) unknown API key → 401 ✓", flush=True)
+
+    # (d) valid key but agent belongs to different account → 403
+    r_forbidden = http_json(
+        "POST", f"{ingress_url}/ingress/v1/events",
+        {**valid_payload,
+         "client_event_id": f"smoke-auth-{utc_ts()}-forbidden",
+         "agent_id": OTHER_AGENT_ID},
+        {"Authorization": f"Bearer {SMOKE_RAW_KEY}",
+         "X-Request-Id": "smoke-auth-forbidden"},
+    )
+    ensure(r_forbidden.status == 403,
+           f"(d) agent ownership mismatch: expected 403 got {r_forbidden.status}")
+    print("  (d) valid key + wrong-account agent → 403 ✓", flush=True)
+
+    # (e) valid key + owned agent → 202
+    r_ok = http_json(
+        "POST", f"{ingress_url}/ingress/v1/events",
+        valid_payload, valid_headers,
+    )
+    ensure(r_ok.status == 202,
+           f"(e) valid auth: expected 202 got {r_ok.status}")
+    print("  (e) valid key + owned agent → 202 ✓", flush=True)
+
+    details["steps"]["auth_checks"] = {
+        "no_header":  {"status": r_no_header.status},
+        "bad_scheme": {"status": r_bad_scheme.status},
+        "unknown_key": {"status": r_unknown.status},
+        "forbidden":  {"status": r_forbidden.status},
+        "ok":         {"status": r_ok.status, "event_id": (r_ok.body_json or {}).get("event_id")},
+    }
+    return [
+        "Auth: missing header → 400",
+        "Auth: non-Bearer scheme → 400",
+        "Auth: unknown key → 401",
+        "Auth: cross-account agent → 403",
+        "Auth: valid key + owned agent → 202",
+    ]
 
 
 def wait_for_broker_submit_delta(broker_url: str, baseline: int, timeout_sec: int = 90) -> int:
@@ -171,6 +414,12 @@ def main() -> int:
     }
 
     try:
+        print("\n=== Phase 0: seed auth DB ===", flush=True)
+        seed_smoke_auth_db()
+        print("  smoke auth fixtures seeded (accounts, agents, keys, broker-accounts)", flush=True)
+        wait_for_auth_ready(ingress_url)
+        summaries.append("Auth DB seeded and cache warm (smoke key accepted by running service)")
+
         print("\n=== Phase 1: service readiness ===", flush=True)
         for name, url in services.items():
             wait_for_readiness(name, url)
@@ -182,27 +431,27 @@ def main() -> int:
         payload = {
             "client_event_id": ingress_idempotency_key,
             "event_intent": "TRADE_SIGNAL",
-            "agent_id": "agent-smoke",
+            "agent_id": SMOKE_AGENT_ID,
             "payload": {"side": "BUY", "qty": 1},
         }
 
         first = http_json("POST", f"{ingress_url}/ingress/v1/events", payload, {
-            "Authorization": "Bearer smoke-token",
+            "Authorization": f"Bearer {SMOKE_RAW_KEY}",
             "X-Request-Id": "smoke-ingress-1",
         })
         second = http_json("POST", f"{ingress_url}/ingress/v1/events", payload, {
-            "Authorization": "Bearer smoke-token",
+            "Authorization": f"Bearer {SMOKE_RAW_KEY}",
             "X-Request-Id": "smoke-ingress-2",
         })
 
         conflict_payload = {
             "client_event_id": ingress_idempotency_key,
             "event_intent": "TRADE_SIGNAL",
-            "agent_id": "agent-smoke",
+            "agent_id": SMOKE_AGENT_ID,
             "payload": {"side": "BUY", "qty": 2},
         }
         third = http_json("POST", f"{ingress_url}/ingress/v1/events", conflict_payload, {
-            "Authorization": "Bearer smoke-token",
+            "Authorization": f"Bearer {SMOKE_RAW_KEY}",
             "X-Request-Id": "smoke-ingress-3",
         })
 
@@ -320,14 +569,14 @@ def main() -> int:
         pipeline_ingress_payload = {
             "client_event_id": pipeline_ingress_key,
             "event_intent": "TRADE_SIGNAL",
-            "agent_id": "agent-smoke-pipeline",
+            "agent_id": SMOKE_PIPELINE_AGENT,
             "payload": {"side": "BUY", "qty": 1},
         }
         pipeline_ingress = http_json(
             "POST",
             f"{ingress_url}/ingress/v1/events",
             pipeline_ingress_payload,
-            {"Authorization": "Bearer smoke-token", "X-Request-Id": "smoke-pipeline-1"},
+            {"Authorization": f"Bearer {SMOKE_RAW_KEY}", "X-Request-Id": "smoke-pipeline-1"},
         )
         details["steps"]["pipeline_ingress"] = {
             "status": pipeline_ingress.status,
@@ -345,6 +594,10 @@ def main() -> int:
         ensure(pipeline_delta == 1, f"expected async pipeline broker delta 1, got {pipeline_delta}")
         summaries.append("Full async pipeline (Ingress->Kafka->event-processor->agent-runtime->risk->order->IBKR) passed")
         print("  async pipeline passed", flush=True)
+
+        auth_summaries = phase_six_auth_checks(ingress_url, details)
+        summaries.extend(auth_summaries)
+        print("  auth checks passed", flush=True)
 
         report = write_reports("PASS", summaries, details, ts)
         print(f"\nsmoke-local PASS -> {report}")

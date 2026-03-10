@@ -4,9 +4,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
+import com.autotrading.libs.auth.BrokerAccountCache;
 import com.autotrading.libs.idempotency.IdempotencyService;
 import com.autotrading.libs.kafka.DirectKafkaPublisher;
 import com.autotrading.libs.observability.GrpcCorrelationServerInterceptor;
@@ -42,14 +44,22 @@ public class IbkrRuntimeConfiguration {
   @Value("${ibkr.cp.poll-interval-ms:5000}")
   private long pollIntervalMs;
 
+  @Value("${broker.account.cache.refresh-interval-ms:60000}")
+  private long brokerAccountCacheRefreshMs;
+
   @Bean
   ReliabilityMetrics reliabilityMetrics(MeterRegistry meterRegistry) {
     return new ReliabilityMetrics(meterRegistry);
   }
 
   @Bean
-  IbkrRestClient ibkrRestClient() {
-    return new IbkrRestClient(cpBaseUrl, cpAccountId);
+  BrokerAccountCache brokerAccountCache(JdbcTemplate jdbcTemplate) {
+    return new BrokerAccountCache(jdbcTemplate, brokerAccountCacheRefreshMs, cpAccountId);
+  }
+
+  @Bean
+  IbkrRestClient ibkrRestClient(BrokerAccountCache brokerAccountCache) {
+    return new IbkrRestClient(cpBaseUrl, brokerAccountCache::resolveOrDefault);
   }
 
   @Bean

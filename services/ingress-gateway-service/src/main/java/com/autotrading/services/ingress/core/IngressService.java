@@ -12,6 +12,7 @@ import java.util.function.BooleanSupplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.autotrading.libs.auth.ApiKeyAuthenticator;
+import com.autotrading.libs.auth.AuthenticatedPrincipal;
 import com.autotrading.libs.commonenvelope.EventEnvelope;
 import com.autotrading.libs.commonenvelope.RequestContext;
 import com.autotrading.libs.idempotency.ClaimOutcome;
@@ -49,14 +52,17 @@ public class IngressService {
   private final ObjectMapper objectMapper;
   private final Tracer tracer;
   private final BooleanSupplier brokerHealthCheck;
+  private final ApiKeyAuthenticator apiKeyAuthenticator;
 
+  /** Test constructor — no auth, no broker health check. */
   public IngressService(
       IdempotencyService idempotencyService,
       KafkaFirstPublisher kafkaFirstPublisher,
       IngressRawEventRepository rawEventRepository,
       ObjectMapper objectMapper,
       Tracer tracer) {
-    this(idempotencyService, kafkaFirstPublisher, rawEventRepository, objectMapper, tracer, () -> true);
+    this(idempotencyService, kafkaFirstPublisher, rawEventRepository, objectMapper, tracer,
+        () -> true, null);
   }
 
   @Autowired
@@ -66,13 +72,15 @@ public class IngressService {
       IngressRawEventRepository rawEventRepository,
       ObjectMapper objectMapper,
       Tracer tracer,
-      BooleanSupplier brokerHealthCheck) {
+      BooleanSupplier brokerHealthCheck,
+      ApiKeyAuthenticator apiKeyAuthenticator) {
     this.idempotencyService = idempotencyService;
     this.kafkaFirstPublisher = kafkaFirstPublisher;
     this.rawEventRepository = rawEventRepository;
     this.objectMapper = objectMapper;
     this.tracer = tracer;
     this.brokerHealthCheck = brokerHealthCheck;
+    this.apiKeyAuthenticator = apiKeyAuthenticator;
   }
 
   /**
@@ -117,6 +125,14 @@ public class IngressService {
     String eventId = resolveTraceId();
     Instant now = Instant.now();
 
+    // Resolve authentication — null authenticator in tests uses anonymous fallback
+    AuthenticatedPrincipal principal = resolvePrincipal(authorization);
+    String principalId  = principal != null ? principal.accountId() : "anonymous";
+    String principalJson = principal != null
+        ? "{\"accountId\":\"" + principal.accountId() + "\",\"keyGeneration\":" + principal.generation() + "}"
+        : null;
+    MDC.put("principal_id", principalId);
+
     String payloadJson = serialize(request);
     String partitionKey = request.agent_id() != null ? request.agent_id() : request.integration_id();
 
@@ -135,7 +151,7 @@ public class IngressService {
         1,
         now,
         new RequestContext(eventId, requestId, request.client_event_id(),
-            "anonymous", now),
+            principalId, now),
         request.agent_id(),
         null,
         envelopePayload);
@@ -154,7 +170,7 @@ public class IngressService {
         request.source_event_id(),
         request.agent_id(),
         request.integration_id(),
-        null,             // principalJson – extracted from authorization header in future
+        principalJson,
         payloadJson,
         "ACCEPTED",
         now);
@@ -189,6 +205,36 @@ public class IngressService {
     if (blank(request.client_event_id()) || blank(request.event_intent()) || request.payload() == null) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "missing required request fields");
     }
+
+    // Skip auth when no authenticator is wired (test/no-op mode)
+    if (apiKeyAuthenticator == null) return;
+
+    // Require "Bearer <token>" format
+    if (!authorization.startsWith("Bearer ")) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Authorization must use Bearer scheme");
+    }
+    String rawKey = authorization.substring(7);
+
+    AuthenticatedPrincipal principal = apiKeyAuthenticator.authenticate(rawKey)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid or expired API key"));
+
+    // Verify the agent belongs to the calling account
+    if (!blank(request.agent_id()) &&
+        !apiKeyAuthenticator.isAgentOwnedBy(request.agent_id(), principal.accountId())) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+          "agent_id '" + request.agent_id() + "' does not belong to authenticating account");
+    }
+  }
+
+  /**
+   * Resolves the principal from the Authorization header without throwing.
+   * Returns {@code null} when the authenticator is absent (test mode) or the key
+   * is not in Bearer format.
+   */
+  private AuthenticatedPrincipal resolvePrincipal(String authorization) {
+    if (apiKeyAuthenticator == null) return null;
+    if (authorization == null || !authorization.startsWith("Bearer ")) return null;
+    return apiKeyAuthenticator.authenticate(authorization.substring(7)).orElse(null);
   }
 
   private IngressAcceptedResponse toResponse(
