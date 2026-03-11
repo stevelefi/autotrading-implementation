@@ -16,7 +16,7 @@ PostgreSQL persistence, and a full observability stack.
   ```
 3. Launch admin portal:
   ```bash
-  python3 tools/admin-ui/start.py
+  python3 scripts/admin-ui.py
   ```
 4. Open:
   - Admin UI: `http://localhost:8765`
@@ -714,7 +714,15 @@ The local admin UI runs on `http://localhost:8765` (or `http://localhost:5173` i
 Start the admin UI:
 
 ```bash
-python3 tools/admin-ui/start.py
+python3 scripts/admin-ui.py
+```
+
+Optional modes:
+
+```bash
+python3 scripts/admin-ui.py dev
+python3 scripts/admin-ui.py build
+python3 scripts/admin-ui.py install
 ```
 
 ---
