@@ -1,6 +1,6 @@
 serviceName: trading-service
 image:
-  repository: ghcr.io/example/trading-service
+  repository: ghcr.io/stevelefi/autotrading-implementation
   tag: latest
   digest: ""
   pullPolicy: IfNotPresent
@@ -24,7 +24,6 @@ resources:
     cpu: "100m"
     memory: "128Mi"
 
-# Internal QA automation API — disabled by default; enable only in dedicated QA environments
 qa:
   api:
-    enabled: false
+    enabled: true

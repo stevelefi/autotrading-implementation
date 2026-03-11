@@ -1,0 +1,324 @@
+name: Deploy (tag-driven GitOps)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: deploy-tag-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify-tag-on-main:
+    name: Verify tag commit is on main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag ancestry
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          TAG_SHA="${GITHUB_SHA}"
+          MAIN_SHA="$(git rev-parse origin/main)"
+
+          if git merge-base --is-ancestor "$TAG_SHA" "$MAIN_SHA"; then
+            echo "Tag ${GITHUB_REF_NAME} is reachable from main"
+          else
+            echo "Tag ${GITHUB_REF_NAME} is not based on current main" >&2
+            exit 1
+          fi
+
+  resolve-release-image:
+    name: Resolve release image digest
+    runs-on: ubuntu-latest
+    needs: verify-tag-on-main
+    outputs:
+      image_repository: ${{ steps.resolve.outputs.image_repository }}
+      image_digest: ${{ steps.resolve.outputs.image_digest }}
+    steps:
+      - name: Install crane
+        run: |
+          set -euo pipefail
+          go install github.com/google/go-containerregistry/cmd/crane@v0.20.3
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve digest from release tag
+        id: resolve
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GHCR_IMAGE_REPOSITORY: ${{ vars.GHCR_IMAGE_REPOSITORY }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          IMAGE_REPOSITORY="${GHCR_IMAGE_REPOSITORY:-ghcr.io/${GITHUB_REPOSITORY}}"
+          IMAGE_REF="${IMAGE_REPOSITORY}:${RELEASE_TAG}"
+
+          echo "$GITHUB_TOKEN" | crane auth login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          IMAGE_DIGEST="$(crane digest "$IMAGE_REF")"
+
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "Invalid image digest resolved for $IMAGE_REF: $IMAGE_DIGEST" >&2
+            exit 1
+          fi
+
+          echo "image_repository=${IMAGE_REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "image_digest=${IMAGE_DIGEST}" >> "$GITHUB_OUTPUT"
+
+  promote-qa:
+    name: Promote tag to QA (GitOps)
+    runs-on: ubuntu-latest
+    needs: resolve-release-image
+    environment:
+      name: qa
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update QA image tag in GitOps values
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          IMAGE_REPOSITORY: ${{ needs.resolve-release-image.outputs.image_repository }}
+          IMAGE_DIGEST: ${{ needs.resolve-release-image.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          python3 scripts/gitops_set_image_tag.py \
+            --file infra/gitops/values-qa.yaml \
+            --repository "$IMAGE_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --digest "$IMAGE_DIGEST"
+
+      - name: Commit and push QA promotion
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- infra/gitops/values-qa.yaml; then
+            echo "QA values already at release tag ${RELEASE_TAG}; no commit needed"
+            exit 0
+          fi
+
+          git add infra/gitops/values-qa.yaml
+          git commit -m "chore(gitops): promote qa to ${RELEASE_TAG}"
+          git push origin HEAD:main
+
+      - name: Promotion summary
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          IMAGE_REPOSITORY: ${{ needs.resolve-release-image.outputs.image_repository }}
+          IMAGE_DIGEST: ${{ needs.resolve-release-image.outputs.image_digest }}
+        run: |
+          {
+            echo "## QA promotion"
+            echo ""
+            echo "- Tag metadata: \\`${RELEASE_TAG}\\`"
+            echo "- Immutable image: \\`${IMAGE_REPOSITORY}@${IMAGE_DIGEST}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  qa-tests:
+    name: QA automation + smoke
+    runs-on: ubuntu-latest
+    needs: promote-qa
+    environment:
+      name: qa
+    steps:
+      - name: Validate required QA test endpoints
+        env:
+          QA_AUTOMATION_URL: ${{ secrets.QA_AUTOMATION_URL }}
+          QA_BASE_URL: ${{ secrets.QA_BASE_URL }}
+        run: |
+          if [ -z "$QA_AUTOMATION_URL" ]; then
+            echo "Missing secret: QA_AUTOMATION_URL" >&2
+            exit 1
+          fi
+          if [ -z "$QA_BASE_URL" ]; then
+            echo "Missing secret: QA_BASE_URL" >&2
+            exit 1
+          fi
+
+      - name: Wait for QA readiness after sync
+        env:
+          QA_BASE_URL: ${{ secrets.QA_BASE_URL }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          url = os.environ["QA_BASE_URL"].rstrip("/") + "/actuator/health/readiness"
+          deadline = time.time() + 600
+          last_error = None
+
+          while time.time() < deadline:
+              try:
+                  with urllib.request.urlopen(url, timeout=20) as response:
+                      payload = json.loads(response.read().decode("utf-8"))
+                      if response.getcode() == 200 and payload.get("status") == "UP":
+                          print("QA readiness is UP")
+                          raise SystemExit(0)
+                      last_error = f"unexpected response: {response.getcode()} {payload}"
+              except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as exc:
+                  last_error = str(exc)
+              time.sleep(10)
+
+          raise SystemExit(f"QA readiness timeout: {last_error}")
+          PY
+
+      - name: Run QA automation endpoint
+        env:
+          QA_AUTOMATION_URL: ${{ secrets.QA_AUTOMATION_URL }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          url = os.environ["QA_AUTOMATION_URL"]
+          with urllib.request.urlopen(url, timeout=180) as response:
+              body = response.read().decode("utf-8")
+              code = response.getcode()
+
+          if code < 200 or code >= 300:
+              raise SystemExit(f"QA automation endpoint failed: HTTP {code}")
+
+          try:
+              payload = json.loads(body)
+          except json.JSONDecodeError:
+              payload = None
+
+          if isinstance(payload, dict):
+              status = str(payload.get("status", "")).upper()
+              if status and status not in {"PASS", "PASSED", "SUCCESS", "OK"}:
+                  raise SystemExit(f"QA automation reported non-pass status: {status}")
+
+          print("QA automation endpoint passed")
+          PY
+
+  verify-qa-parity:
+    name: Verify QA promoted digest parity
+    runs-on: ubuntu-latest
+    needs:
+      - qa-tests
+      - resolve-release-image
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Validate QA image repository/digest match release artifact
+        env:
+          EXPECTED_REPOSITORY: ${{ needs.resolve-release-image.outputs.image_repository }}
+          EXPECTED_DIGEST: ${{ needs.resolve-release-image.outputs.image_digest }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          qa_values = Path("infra/gitops/values-qa.yaml").read_text(encoding="utf-8")
+
+          repository = None
+          digest = None
+          in_image_block = False
+
+          for raw_line in qa_values.splitlines():
+              line = raw_line.rstrip()
+              if line.strip() == "image:":
+                  in_image_block = True
+                  continue
+              if in_image_block and line and not line.startswith("  "):
+                  break
+              if in_image_block and line.lstrip().startswith("repository:"):
+                  repository = line.split(":", 1)[1].strip()
+              if in_image_block and line.lstrip().startswith("digest:"):
+                  digest = line.split(":", 1)[1].strip().strip('"')
+
+          expected_repository = "${EXPECTED_REPOSITORY}".strip()
+          expected_digest = "${EXPECTED_DIGEST}".strip()
+
+          if repository != expected_repository:
+              raise SystemExit(
+                  f"QA repository mismatch: expected {expected_repository}, found {repository}"
+              )
+
+          if digest != expected_digest:
+              raise SystemExit(
+                  f"QA digest mismatch: expected {expected_digest}, found {digest}"
+              )
+
+          print("QA values parity check passed")
+          PY
+
+  promote-prod:
+    name: Promote tag to production (manual approval)
+    runs-on: ubuntu-latest
+    needs:
+      - verify-qa-parity
+      - resolve-release-image
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update production image tag in GitOps values
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          IMAGE_REPOSITORY: ${{ needs.resolve-release-image.outputs.image_repository }}
+          IMAGE_DIGEST: ${{ needs.resolve-release-image.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          python3 scripts/gitops_set_image_tag.py \
+            --file infra/gitops/values-prod.yaml \
+            --repository "$IMAGE_REPOSITORY" \
+            --tag "$RELEASE_TAG" \
+            --digest "$IMAGE_DIGEST"
+
+      - name: Commit and push production promotion
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- infra/gitops/values-prod.yaml; then
+            echo "Production values already at release tag ${RELEASE_TAG}; no commit needed"
+            exit 0
+          fi
+
+          git add infra/gitops/values-prod.yaml
+          git commit -m "chore(gitops): promote prod to ${RELEASE_TAG}"
+          git push origin HEAD:main
+
+      - name: Promotion summary
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          IMAGE_REPOSITORY: ${{ needs.resolve-release-image.outputs.image_repository }}
+          IMAGE_DIGEST: ${{ needs.resolve-release-image.outputs.image_digest }}
+        run: |
+          {
+            echo "## Production promotion"
+            echo ""
+            echo "- Tag metadata: \\`${RELEASE_TAG}\\`"
+            echo "- Immutable image: \\`${IMAGE_REPOSITORY}@${IMAGE_DIGEST}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"

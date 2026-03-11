@@ -74,6 +74,7 @@ For page details, see [Admin UI Pages](#admin-ui-pages).
 14. [Python Script Helpers](#python-script-helpers)
 15. [Monorepo Layout](#monorepo-layout)
 16. [Contributor Instructions](#contributor-instructions)
+17. [Deployment Pipeline](#deployment-pipeline)
 
 ---
 
@@ -793,10 +794,19 @@ tools/                spec_sync.py
 | End-to-end data flow, Kafka-first publish, gRPC command chain | [docs/DATA_FLOW.md](docs/DATA_FLOW.md) |
 | System flow Mermaid diagram, Kafka topics, DB tables per service | [docs/SYSTEM_FLOW.md](docs/SYSTEM_FLOW.md) |
 | Monitoring UIs, Loki LogQL, trace.py, alert runbooks, DB inspection | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) |
+| Tag-driven fully GitOps deployment pipeline (QA gate + manual prod approval) | [docs/DEPLOYMENT_PIPELINE.md](docs/DEPLOYMENT_PIPELINE.md) |
 | Blitz change control and AI agent guardrails | [AGENTS.md](AGENTS.md) |
 | Reliability drill runbooks | [docs/runbooks/reliability-drills.md](docs/runbooks/reliability-drills.md) |
 | Account model, API key auth, BrokerAccountCache, onboard.py | [docs/AUTH_AND_ACCOUNT_MODEL.md](docs/AUTH_AND_ACCOUNT_MODEL.md) |
 | Broker health circuit breaker, BrokerHealthCache, SmartLifecycle phases | [docs/BROKER_HEALTH_CIRCUIT_BREAKER.md](docs/BROKER_HEALTH_CIRCUIT_BREAKER.md) |
+
+## Deployment Pipeline
+
+- Policy implementation: [`.github/workflows/deploy-main.yml`](.github/workflows/deploy-main.yml)
+- Release tag helper: [`.github/workflows/release-tag.yml`](.github/workflows/release-tag.yml)
+- Setup and operations guide: [docs/DEPLOYMENT_PIPELINE.md](docs/DEPLOYMENT_PIPELINE.md)
+- Trigger model: push release tags on main (`v*`), not every main commit.
+- Local/QA credential parity helper: `python3 scripts/sync_credentials_local_qa.py ...`
 
 ### Slack Agent Status
 

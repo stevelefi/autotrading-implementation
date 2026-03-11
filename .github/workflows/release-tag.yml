@@ -1,0 +1,96 @@
+name: Release Tag Helper
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (must start with v, e.g. v1.2.3)"
+        required: true
+        type: string
+      target_sha:
+        description: "Optional commit SHA on main to tag (defaults to latest origin/main)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-release-tag:
+    name: Create and push release tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate inputs and resolve target commit
+        id: resolve
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+          TARGET_SHA_INPUT: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$TAG_INPUT" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+            echo "Tag must start with 'v' and contain only [0-9A-Za-z._-]" >&2
+            exit 1
+          fi
+
+          git fetch origin main --tags --force
+
+          if [ -n "$TARGET_SHA_INPUT" ]; then
+            TARGET_SHA="$TARGET_SHA_INPUT"
+          else
+            TARGET_SHA="$(git rev-parse origin/main)"
+          fi
+
+          if ! git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
+            echo "Target commit does not exist: $TARGET_SHA" >&2
+            exit 1
+          fi
+
+          MAIN_SHA="$(git rev-parse origin/main)"
+          if ! git merge-base --is-ancestor "$TARGET_SHA" "$MAIN_SHA"; then
+            echo "Target commit is not reachable from origin/main: $TARGET_SHA" >&2
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${TAG_INPUT}" >/dev/null; then
+            echo "Tag already exists locally: ${TAG_INPUT}" >&2
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_INPUT}" >/dev/null 2>&1; then
+            echo "Tag already exists on origin: ${TAG_INPUT}" >&2
+            exit 1
+          fi
+
+          echo "tag=${TAG_INPUT}" >> "$GITHUB_OUTPUT"
+          echo "target_sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push annotated tag
+        env:
+          TAG_NAME: ${{ steps.resolve.outputs.tag }}
+          TARGET_SHA: ${{ steps.resolve.outputs.target_sha }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git tag -a "$TAG_NAME" "$TARGET_SHA" -m "Release $TAG_NAME (created by $ACTOR)"
+          git push origin "refs/tags/$TAG_NAME"
+
+      - name: Summary
+        env:
+          TAG_NAME: ${{ steps.resolve.outputs.tag }}
+          TARGET_SHA: ${{ steps.resolve.outputs.target_sha }}
+        run: |
+          {
+            echo "## Release tag created"
+            echo ""
+            echo "- Tag: \\`$TAG_NAME\\`"
+            echo "- Commit: \\`$TARGET_SHA\\`"
+            echo "- Next: deployment workflow triggers automatically from this tag"
+          } >> "$GITHUB_STEP_SUMMARY"

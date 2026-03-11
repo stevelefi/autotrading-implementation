@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: autotrading-qa
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stevelefi/autotrading-implementation.git
+    targetRevision: main
+    path: infra/helm/charts/trading-service
+    helm:
+      valueFiles:
+        - ../../../gitops/values-qa.yaml
+      parameters:
+        - name: image.tag
+          value: latest
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: autotrading-qa
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
