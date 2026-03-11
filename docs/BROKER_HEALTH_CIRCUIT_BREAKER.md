@@ -74,7 +74,7 @@ ordering races don't block the service.
 
 ### Source reference
 
-- [IbkrHealthProbe.java](../services/ibkr-connector-service/src/main/java/com/autotrading/services/ibkr/client/IbkrHealthProbe.java)
+- [IbkrHealthProbe.java](https://github.com/stevelefi/autotrading-implementation/blob/main/services/ibkr-connector-service/src/main/java/com/autotrading/services/ibkr/client/IbkrHealthProbe.java)
 
 ---
 
@@ -99,7 +99,7 @@ for one extra cache refresh cycle (≤ 15 s).
 
 ### Source reference
 
-- [BrokerHealthPersister.java](../services/ibkr-connector-service/src/main/java/com/autotrading/services/ibkr/health/BrokerHealthPersister.java)
+- [BrokerHealthPersister.java](https://github.com/stevelefi/autotrading-implementation/blob/main/services/ibkr-connector-service/src/main/java/com/autotrading/services/ibkr/health/BrokerHealthPersister.java)
 
 ---
 
@@ -164,7 +164,7 @@ set to an accurate value before the service begins accepting real traffic.
 
 ### Source reference
 
-- [BrokerHealthCache.java](../libs/reliability-core/src/main/java/com/autotrading/libs/health/BrokerHealthCache.java)
+- [BrokerHealthCache.java](https://github.com/stevelefi/autotrading-implementation/blob/main/libs/reliability-core/src/main/java/com/autotrading/libs/health/BrokerHealthCache.java)
 
 ---
 
@@ -195,8 +195,8 @@ rejecting pre-claim, the `client_event_id` stays unclaimed and the client can re
 
 ### Source references
 
-- [IngressService.java](../services/ingress-gateway-service/src/main/java/com/autotrading/services/ingress/core/IngressService.java)
-- [IngressGatewayConfiguration.java](../services/ingress-gateway-service/src/main/java/com/autotrading/services/ingress/IngressGatewayConfiguration.java)
+- [IngressService.java](https://github.com/stevelefi/autotrading-implementation/blob/main/services/ingress-gateway-service/src/main/java/com/autotrading/services/ingress/core/IngressService.java)
+- [IngressGatewayConfiguration.java](https://github.com/stevelefi/autotrading-implementation/blob/main/services/ingress-gateway-service/src/main/java/com/autotrading/services/ingress/IngressGatewayConfiguration.java)
 
 ---
 
@@ -226,8 +226,8 @@ watchdog) returns `COMMAND_STATUS_REJECTED` and takes precedence over the broker
 
 ### Source references
 
-- [OrderSafetyEngine.java](../services/order-service/src/main/java/com/autotrading/services/order/core/OrderSafetyEngine.java)
-- [OrderRuntimeConfiguration.java](../services/order-service/src/main/java/com/autotrading/services/order/runtime/OrderRuntimeConfiguration.java)
+- [OrderSafetyEngine.java](https://github.com/stevelefi/autotrading-implementation/blob/main/services/order-service/src/main/java/com/autotrading/services/order/core/OrderSafetyEngine.java)
+- [OrderRuntimeConfiguration.java](https://github.com/stevelefi/autotrading-implementation/blob/main/services/order-service/src/main/java/com/autotrading/services/order/runtime/OrderRuntimeConfiguration.java)
 
 ---
 
