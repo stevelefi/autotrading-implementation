@@ -74,6 +74,7 @@ For page details, see [Admin UI Pages](#admin-ui-pages).
 14. [Python Script Helpers](#python-script-helpers)
 15. [Monorepo Layout](#monorepo-layout)
 16. [Contributor Instructions](#contributor-instructions)
+17. [Release Versioning](#release-versioning)
 
 ---
 
@@ -813,3 +814,30 @@ Uses reusable workflow from `stevelefi/autotrading-devops`
 
 Required GitHub secrets: `SLACK_BOT_TOKEN`, `SLACK_CHANNEL_ID_STATUS`
 Optional: `SLACK_ONCALL_GROUP_ID` (used for `BLOCKED` mentions)
+
+---
+
+## Release Versioning
+
+Production tags are standardized to GitHub-common SemVer:
+
+- Required format: `vMAJOR.MINOR.PATCH`
+- Examples: `v1.0.0`, `v1.2.3`
+- Optional prerelease (non-production): `v1.2.3-rc.1`, `v1.2.3-beta.2`
+- Invalid examples: `1.0.0`, `impl-v1.0.0`, `v1.0`
+
+Use these bump rules:
+
+- `PATCH` (`x.y.Z`): backward-compatible bug fixes only
+- `MINOR` (`x.Y.z`): backward-compatible feature additions
+- `MAJOR` (`X.y.z`): breaking behavior/contract changes
+
+Create annotated tags on `main` only:
+
+```bash
+git checkout main && git pull
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
+```
+
+Tag pushes are validated in CI; non-conforming tags fail fast.
