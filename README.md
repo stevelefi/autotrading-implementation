@@ -40,9 +40,17 @@ PostgreSQL persistence, and a full observability stack.
 
 ## Portal Visibility (Admin UI)
 
-- Tests page: [docs/assets/admin-ui/tests-page.png](docs/assets/admin-ui/tests-page.png)
-- Health page: [docs/assets/admin-ui/health-page.png](docs/assets/admin-ui/health-page.png)
-- Onboard page: [docs/assets/admin-ui/onboard-page.png](docs/assets/admin-ui/onboard-page.png)
+### Tests Page
+
+![Tests Page](docs/assets/admin-ui/tests-page.png)
+
+### Health Page
+
+![Health Page](docs/assets/admin-ui/health-page.png)
+
+### Onboard Page
+
+![Onboard Page](docs/assets/admin-ui/onboard-page.png)
 
 For page details, see [Admin UI Pages](#admin-ui-pages).
 
