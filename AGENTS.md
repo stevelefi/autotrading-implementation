@@ -25,6 +25,11 @@ Before writing code, agents must:
    python3 scripts/branch_check.py
    ```
 
+## Release Tag Convention
+1. Production release tags must follow SemVer with a `v` prefix: `vMAJOR.MINOR.PATCH` (for example `v1.0.0`).
+2. Optional prerelease tags are allowed for non-production: `vMAJOR.MINOR.PATCH-<label>` (for example `v1.0.0-rc.1`).
+3. Create annotated release tags from `main` only.
+
 ## Required Local Checks Before Commit
 1. Run `tools/spec_sync.py sync` using `repo_url` and `ref` from `SPEC_VERSION.json`.
 2. `python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json`.
