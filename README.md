@@ -3,6 +3,45 @@
 Production-grade paper-trading system: 8 microservices, contract-first gRPC + Kafka backbone,
 PostgreSQL persistence, and a full observability stack.
 
+## Navigation by Goal
+
+- New here and want to run it fast: [Start Here (2-minute setup)](#start-here-2-minute-setup)
+- Want complete local setup and checks: [Quick Start](#quick-start)
+- Want to use the local operations portal: [Admin UI Preview](#admin-ui-preview) and [Admin UI Pages](#admin-ui-pages)
+- Want architecture and message flow: [Architecture Overview](#architecture-overview), [System Flow](#system-flow), [Data Flow](#data-flow)
+- Want service and reliability details: [Services](#services), [Kafka Topics](#kafka-topics), [Reliability Guarantees](#reliability-guarantees)
+- Want contributor and release rules: [Contributor Instructions](#contributor-instructions), [Release Versioning](#release-versioning)
+
+---
+
+## Table of Contents
+
+### Setup and Operations
+
+- [Start Here (2-minute setup)](#start-here-2-minute-setup)
+- [Quick Start](#quick-start)
+- [Admin UI Preview](#admin-ui-preview)
+- [Admin UI Pages](#admin-ui-pages)
+- [Python Script Helpers](#python-script-helpers)
+
+### System Design
+
+- [Architecture Overview](#architecture-overview)
+- [Services](#services)
+- [System Flow](#system-flow)
+- [Data Flow](#data-flow)
+- [Kafka Topics](#kafka-topics)
+- [Reliability Guarantees](#reliability-guarantees)
+- [Authentication and Account Model](#authentication-and-account-model)
+- [Database](#database)
+- [Tracing and Observability](#tracing-and-observability)
+
+### Development and Governance
+
+- [Monorepo Layout](#monorepo-layout)
+- [Contributor Instructions](#contributor-instructions)
+- [Release Versioning](#release-versioning)
+
 ## Start Here (2-minute setup)
 
 1. Verify pinned spec baseline:
@@ -25,7 +64,7 @@ PostgreSQL persistence, and a full observability stack.
   - Redpanda Console: `http://localhost:8081`
 
 | Item | Value |
-|------|-------|
+| --- | --- |
 | Spec baseline | `spec-v1.0.1-m0m1` (pinned in `SPEC_VERSION.json`) |
 | Language | Java 21 |
 | Framework | Spring Boot 3.3.5 |
@@ -38,7 +77,7 @@ PostgreSQL persistence, and a full observability stack.
 
 ---
 
-## Portal Visibility (Admin UI)
+## Admin UI Preview
 
 ### Tests Page
 
@@ -53,28 +92,6 @@ PostgreSQL persistence, and a full observability stack.
 ![Onboard Page](docs/assets/admin-ui/onboard-page.png)
 
 For page details, see [Admin UI Pages](#admin-ui-pages).
-
----
-
-## Table of Contents
-
-1. [Start Here (2-minute setup)](#start-here-2-minute-setup)
-2. [Portal Visibility (Admin UI)](#portal-visibility-admin-ui)
-3. [Quick Start](#quick-start)
-4. [Admin UI Pages](#admin-ui-pages)
-5. [Architecture Overview](#architecture-overview)
-6. [Services](#services)
-7. [System Flow](#system-flow)
-8. [Data Flow](#data-flow)
-9. [Kafka Topics](#kafka-topics)
-10. [Reliability Guarantees](#reliability-guarantees)
-11. [Authentication and Account Model](#authentication-and-account-model)
-12. [Database](#database)
-13. [Tracing and Observability](#tracing-and-observability)
-14. [Python Script Helpers](#python-script-helpers)
-15. [Monorepo Layout](#monorepo-layout)
-16. [Contributor Instructions](#contributor-instructions)
-17. [Release Versioning](#release-versioning)
 
 ---
 
