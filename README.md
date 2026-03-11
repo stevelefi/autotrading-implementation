@@ -3,6 +3,27 @@
 Production-grade paper-trading system: 8 microservices, contract-first gRPC + Kafka backbone,
 PostgreSQL persistence, and a full observability stack.
 
+## Start Here (2-minute setup)
+
+1. Verify pinned spec baseline:
+  ```bash
+  python3 tools/spec_sync.py verify --dest specs/vendor --version-file SPEC_VERSION.json
+  ```
+2. Start local stack + run smoke:
+  ```bash
+  python3 scripts/stack.py up
+  python3 scripts/smoke_local.py
+  ```
+3. Launch admin portal:
+  ```bash
+  python3 tools/admin-ui/start.py
+  ```
+4. Open:
+  - Admin UI: `http://localhost:8765`
+  - Grafana: `http://localhost:3000`
+  - Prometheus: `http://localhost:9090`
+  - Redpanda Console: `http://localhost:8081`
+
 | Item | Value |
 |------|-------|
 | Spec baseline | `spec-v1.0.1-m0m1` (pinned in `SPEC_VERSION.json`) |
@@ -17,22 +38,34 @@ PostgreSQL persistence, and a full observability stack.
 
 ---
 
+## Portal Visibility (Admin UI)
+
+- Tests page: [docs/assets/admin-ui/tests-page.png](docs/assets/admin-ui/tests-page.png)
+- Health page: [docs/assets/admin-ui/health-page.png](docs/assets/admin-ui/health-page.png)
+- Onboard page: [docs/assets/admin-ui/onboard-page.png](docs/assets/admin-ui/onboard-page.png)
+
+For page details, see [Admin UI Pages](#admin-ui-pages).
+
+---
+
 ## Table of Contents
 
-1. [Architecture Overview](#architecture-overview)
-2. [Services](#services)
-3. [System Flow](#system-flow)
-4. [Data Flow](#data-flow)
-5. [Kafka Topics](#kafka-topics)
-6. [Reliability Guarantees](#reliability-guarantees)
-7. [Authentication and Account Model](#authentication-and-account-model)
-8. [Database](#database)
-9. [Tracing and Observability](#tracing-and-observability)
-10. [Python Script Helpers](#python-script-helpers)
-11. [Admin UI Pages](#admin-ui-pages)
-12. [Quick Start](#quick-start)
-13. [Monorepo Layout](#monorepo-layout)
-14. [Contributor Instructions](#contributor-instructions)
+1. [Start Here (2-minute setup)](#start-here-2-minute-setup)
+2. [Portal Visibility (Admin UI)](#portal-visibility-admin-ui)
+3. [Quick Start](#quick-start)
+4. [Admin UI Pages](#admin-ui-pages)
+5. [Architecture Overview](#architecture-overview)
+6. [Services](#services)
+7. [System Flow](#system-flow)
+8. [Data Flow](#data-flow)
+9. [Kafka Topics](#kafka-topics)
+10. [Reliability Guarantees](#reliability-guarantees)
+11. [Authentication and Account Model](#authentication-and-account-model)
+12. [Database](#database)
+13. [Tracing and Observability](#tracing-and-observability)
+14. [Python Script Helpers](#python-script-helpers)
+15. [Monorepo Layout](#monorepo-layout)
+16. [Contributor Instructions](#contributor-instructions)
 
 ---
 
