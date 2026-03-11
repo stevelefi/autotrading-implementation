@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { LogViewer } from '@/components/LogViewer'
 
 const SERVICES = [
   'all', 'ingress-gateway-service', 'risk-service', 'order-service',
@@ -60,6 +61,7 @@ interface TraceEntry {
 export default function TracePage() {
   const form = useForm({ resolver: zodResolver(TraceSchema), defaultValues: { since: '1h' } })
   const [entries, setEntries] = useState<TraceEntry[]>([])
+  const [manualKey, setManualKey] = useState<string | null>(null)
 
   const query = useMutation({
     mutationFn: (body: z.infer<typeof TraceSchema>) =>
@@ -74,6 +76,10 @@ export default function TracePage() {
       }).then(r => r.json()),
     onSuccess: (data: { entries: TraceEntry[] }) => setEntries(data.entries ?? []),
   })
+
+  function runManualTrace() {
+    setManualKey(`/api/trace/manual?run=${Date.now()}`)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -152,8 +158,25 @@ export default function TracePage() {
               <Button type="submit" className="w-fit" disabled={query.isPending}>
                 {query.isPending ? 'Querying Loki…' : 'Query Logs'}
               </Button>
+              <Button type="button" variant="outline" className="w-fit" onClick={runManualTrace}>
+                Run Manual Trace
+              </Button>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Internal Observability Links</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            <a className="underline text-primary" href="http://localhost:3000" target="_blank" rel="noreferrer">Grafana</a>
+            <a className="underline text-primary" href="http://localhost:3000/d/autotrading-reliability" target="_blank" rel="noreferrer">Grafana Reliability Dashboard</a>
+            <a className="underline text-primary" href="http://localhost:9090" target="_blank" rel="noreferrer">Prometheus</a>
+            <a className="underline text-primary" href="http://localhost:8081" target="_blank" rel="noreferrer">Redpanda Console</a>
+            <a className="underline text-primary" href="http://localhost:3100/ready" target="_blank" rel="noreferrer">Loki Ready</a>
+            <a className="underline text-primary" href="http://localhost:3200" target="_blank" rel="noreferrer">Tempo</a>
+          </div>
         </CardContent>
       </Card>
 
@@ -183,6 +206,25 @@ export default function TracePage() {
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {manualKey && (
+        <Card>
+          <CardHeader><CardTitle>Manual Trace Output</CardTitle></CardHeader>
+          <CardContent>
+            <LogViewer
+              streamKey={manualKey}
+              body={{
+                clientEventId: form.getValues('clientEventId') || undefined,
+                agentId: form.getValues('agentId') || undefined,
+                side: 'BUY',
+                qty: 1,
+                lokiSince: form.getValues('since') || '15m',
+              }}
+              heightClass="h-[360px]"
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

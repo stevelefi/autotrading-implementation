@@ -9,6 +9,10 @@ interface ServiceHealth {
   status:  string
 }
 
+interface ServicesResponse {
+  services: ServiceHealth[]
+}
+
 interface Container {
   Name?:   string
   name?:   string
@@ -16,6 +20,35 @@ interface Container {
   status?: string
   State?:  string
   state?:  string
+}
+
+interface ContainersResponse {
+  containers: Container[]
+}
+
+interface BrokerStatusResponse {
+  brokerId: string
+  healthTableStatus: string
+  healthTableUpdatedAt?: string
+  healthTableDetailJson?: string
+  connectorStatus: string
+  connectorStats?: Record<string, unknown>
+}
+
+interface ActivityItem {
+  received_at: string
+  ingress_event_id: string
+  idempotency_key: string
+  agent_id?: string
+  ingestion_status: string
+  order_intent_id?: string
+  trade_state?: string
+  last_status_at?: string
+}
+
+interface ActivityResponse {
+  items: ActivityItem[]
+  limit: number
 }
 
 // Map raw Docker service names → short display names
@@ -49,12 +82,12 @@ const APP_SERVICE_NAMES = new Set([
 ])
 
 function cleanContainerName(raw: string): string {
-  // Strip docker-compose project/replica suffixes like "autotrading-implementation-risk-service-1"
-  return raw.replace(/^[a-z0-9-]+-1$|^[a-z0-9-]+-autotrading-[a-z0-9-]+-1$/, s => {
-    const m = s.match(/^(?:[a-z0-9]+-)+?([a-z-]+-(?:service|api|connector|simulator|console|collector|init))(?:-\d+)?$/)
-    return m ? m[1] : s
-  }).replace(/^.*?((?:ingress-gateway|risk|order|ibkr-connector|agent-runtime|event-processor|monitoring-api|performance|postgres|redpanda(?:-console|-init)?|prometheus|grafana|loki|promtail|otel-collector|tempo|flyway-init|redpanda-init|ibkr-simulator).*)$/, '$1')
-    .replace(/-\d+$/, '')
+  const normalized = raw.toLowerCase().replace(/^\//, '')
+  const known = Object.keys(SHORT_SERVICE).sort((a, b) => b.length - a.length)
+  for (const name of known) {
+    if (normalized.includes(name)) return name
+  }
+  return normalized.replace(/-\d+$/, '')
 }
 
 function displayName(raw: string): string {
@@ -70,28 +103,51 @@ function statusVariant(s: string): 'default' | 'destructive' | 'secondary' | 'ou
 }
 
 export default function HealthPage() {
-  const { data: services, refetch: refetchServices, isFetching: fetchingServices } =
-    useQuery<ServiceHealth[]>({
+  const { data: servicesResp, refetch: refetchServices, isFetching: fetchingServices } =
+    useQuery<ServicesResponse>({
       queryKey: ['health'],
-      queryFn: () => fetch('/api/stack/health').then(r => r.json()),
+      queryFn: () => fetch('/api/health/services').then(r => r.json()),
       refetchInterval: 30_000,
     })
 
-  const { data: containers, refetch: refetchContainers, isFetching: fetchingContainers } =
-    useQuery<Container[]>({
+  const { data: containersResp, refetch: refetchContainers, isFetching: fetchingContainers } =
+    useQuery<ContainersResponse>({
       queryKey: ['containers'],
-      queryFn: () => fetch('/api/stack/status').then(r => r.json()),
+      queryFn: () => fetch('/api/health/containers').then(r => r.json()),
       refetchInterval: 30_000,
     })
 
-  function refetch() { void refetchServices(); void refetchContainers() }
-  const isFetching = fetchingServices || fetchingContainers
+  const { data: brokerResp, refetch: refetchBroker, isFetching: fetchingBroker } =
+    useQuery<BrokerStatusResponse>({
+      queryKey: ['broker-health'],
+      queryFn: () => fetch('/api/health/broker').then(r => r.json()),
+      refetchInterval: 30_000,
+    })
 
-  const appContainers = (containers ?? []).filter(c => {
+  const { data: activityResp, refetch: refetchActivity, isFetching: fetchingActivity } =
+    useQuery<ActivityResponse>({
+      queryKey: ['trade-activity'],
+      queryFn: () => fetch('/api/health/activity?limit=50').then(r => r.json()),
+      refetchInterval: 15_000,
+    })
+
+  function refetch() {
+    void refetchServices()
+    void refetchContainers()
+    void refetchBroker()
+    void refetchActivity()
+  }
+  const isFetching = fetchingServices || fetchingContainers || fetchingBroker || fetchingActivity
+
+  const containers = containersResp?.containers ?? []
+  const services = servicesResp?.services ?? []
+  const activity = activityResp?.items ?? []
+
+  const appContainers = containers.filter(c => {
     const name = cleanContainerName(c.Name ?? c.name ?? '')
     return APP_SERVICE_NAMES.has(name)
   })
-  const infraContainers = (containers ?? []).filter(c => {
+  const infraContainers = containers.filter(c => {
     const name = cleanContainerName(c.Name ?? c.name ?? '')
     return !APP_SERVICE_NAMES.has(name)
   })
@@ -160,6 +216,79 @@ export default function HealthPage() {
           <CardTitle className="text-base">Infrastructure</CardTitle>
         </CardHeader>
         <CardContent>{renderContainerGrid(infraContainers)}</CardContent>
+      </Card>
+
+      {/* Broker health */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Broker Health Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!brokerResp ? (
+            <p className="text-sm text-muted-foreground">No broker health data yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Broker</p>
+                <p className="font-mono text-sm">{brokerResp.brokerId}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Health Table</p>
+                <Badge variant={statusVariant(brokerResp.healthTableStatus)}>{brokerResp.healthTableStatus}</Badge>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Connector</p>
+                <Badge variant={statusVariant(brokerResp.connectorStatus)}>{brokerResp.connectorStatus}</Badge>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Updated At</p>
+                <p className="font-mono text-xs truncate">{brokerResp.healthTableUpdatedAt ?? 'n/a'}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ingress / trade status */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Ingress → Trade Status (Recent)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">received_at</th>
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">ingress_event_id</th>
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">agent_id</th>
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">ingress_status</th>
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">order_intent_id</th>
+                  <th className="text-left py-2 px-3 font-medium text-muted-foreground">trade_state</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activity.map((row, idx) => (
+                  <tr key={`${row.ingress_event_id}-${idx}`} className="border-b last:border-0">
+                    <td className="py-2 px-3 font-mono">{row.received_at}</td>
+                    <td className="py-2 px-3 font-mono" title={row.ingress_event_id}>{row.ingress_event_id}</td>
+                    <td className="py-2 px-3 font-mono">{row.agent_id ?? ''}</td>
+                    <td className="py-2 px-3"><Badge variant={statusVariant(row.ingestion_status)}>{row.ingestion_status}</Badge></td>
+                    <td className="py-2 px-3 font-mono">{row.order_intent_id ?? ''}</td>
+                    <td className="py-2 px-3">
+                      {row.trade_state ? <Badge variant={statusVariant(row.trade_state)}>{row.trade_state}</Badge> : '-'}
+                    </td>
+                  </tr>
+                ))}
+                {activity.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-4 text-center text-muted-foreground">No ingress/trade activity yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

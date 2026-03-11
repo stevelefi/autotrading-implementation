@@ -10,7 +10,7 @@ from typing import Optional
 
 import psycopg2
 import psycopg2.extras
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -43,6 +43,11 @@ class AccountCreate(BaseModel):
     displayName: str
 
 
+class AccountUpdate(BaseModel):
+    displayName: Optional[str] = None
+    active: Optional[bool] = None
+
+
 @router.get("/accounts")
 def list_accounts():
     with _conn() as conn, conn.cursor() as cur:
@@ -63,12 +68,54 @@ def create_account(body: AccountCreate):
     return {"ok": True}
 
 
+@router.delete("/accounts/{account_id}")
+def delete_account(account_id: str):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM accounts WHERE account_id = %s", (account_id,))
+        exists = cur.fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail=f"Account not found: {account_id}")
+
+        cur.execute(
+            "DELETE FROM broker_accounts WHERE agent_id IN (SELECT agent_id FROM agents WHERE account_id = %s)",
+            (account_id,),
+        )
+        cur.execute("DELETE FROM account_api_keys WHERE account_id = %s", (account_id,))
+        cur.execute("DELETE FROM agents WHERE account_id = %s", (account_id,))
+        cur.execute("DELETE FROM accounts WHERE account_id = %s", (account_id,))
+        conn.commit()
+
+    return {"ok": True, "deletedAccountId": account_id}
+
+
+@router.put("/accounts/{account_id}")
+def update_account(account_id: str, body: AccountUpdate):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """UPDATE accounts
+               SET display_name = COALESCE(%s, display_name),
+                   active = COALESCE(%s, active)
+               WHERE account_id = %s""",
+            (body.displayName, body.active, account_id),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Account not found: {account_id}")
+        conn.commit()
+    return {"ok": True, "accountId": account_id}
+
+
 # ── Agents ────────────────────────────────────────────────────────────────────
 
 class AgentCreate(BaseModel):
     agentId: str
     accountId: str
     displayName: str
+
+
+class AgentUpdate(BaseModel):
+    accountId: Optional[str] = None
+    displayName: Optional[str] = None
+    active: Optional[bool] = None
 
 
 @router.get("/agents")
@@ -97,6 +144,34 @@ def create_agent(body: AgentCreate):
     return {"ok": True}
 
 
+@router.put("/agents/{agent_id}")
+def update_agent(agent_id: str, body: AgentUpdate):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """UPDATE agents
+               SET account_id = COALESCE(%s, account_id),
+                   display_name = COALESCE(%s, display_name),
+                   active = COALESCE(%s, active)
+               WHERE agent_id = %s""",
+            (body.accountId, body.displayName, body.active, agent_id),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
+        conn.commit()
+    return {"ok": True, "agentId": agent_id}
+
+
+@router.delete("/agents/{agent_id}")
+def delete_agent(agent_id: str):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM broker_accounts WHERE agent_id = %s", (agent_id,))
+        cur.execute("DELETE FROM agents WHERE agent_id = %s", (agent_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
+        conn.commit()
+    return {"ok": True, "deletedAgentId": agent_id}
+
+
 # ── API Keys ──────────────────────────────────────────────────────────────────
 
 class ApiKeyGenerate(BaseModel):
@@ -106,6 +181,10 @@ class ApiKeyGenerate(BaseModel):
 
 class ApiKeyRevoke(BaseModel):
     keyHash: str
+
+
+class ApiKeyUpdate(BaseModel):
+    active: Optional[bool] = None
 
 
 @router.get("/apikeys")
@@ -146,11 +225,39 @@ def revoke_apikey(body: ApiKeyRevoke):
     return {"ok": True}
 
 
+@router.put("/apikeys/{key_hash}")
+def update_apikey(key_hash: str, body: ApiKeyUpdate):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "UPDATE account_api_keys SET active = COALESCE(%s, active) WHERE key_hash = %s",
+            (body.active, key_hash),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"API key not found: {key_hash}")
+        conn.commit()
+    return {"ok": True, "keyHash": key_hash}
+
+
+@router.delete("/apikeys/{key_hash}")
+def delete_apikey(key_hash: str):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM account_api_keys WHERE key_hash = %s", (key_hash,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"API key not found: {key_hash}")
+        conn.commit()
+    return {"ok": True, "deletedKeyHash": key_hash}
+
+
 # ── Brokers ───────────────────────────────────────────────────────────────────
 
 class BrokerCreate(BaseModel):
     agentId: str
     externalAccountId: str
+
+
+class BrokerUpdate(BaseModel):
+    externalAccountId: Optional[str] = None
+    active: Optional[bool] = None
 
 
 @router.get("/brokers")
@@ -180,3 +287,29 @@ def create_broker(body: BrokerCreate):
         )
         conn.commit()
     return {"ok": True}
+
+
+@router.put("/brokers/{broker_account_id}")
+def update_broker(broker_account_id: str, body: BrokerUpdate):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """UPDATE broker_accounts
+               SET external_account_id = COALESCE(%s, external_account_id),
+                   active = COALESCE(%s, active)
+               WHERE broker_account_id = %s""",
+            (body.externalAccountId, body.active, broker_account_id),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Broker mapping not found: {broker_account_id}")
+        conn.commit()
+    return {"ok": True, "brokerAccountId": broker_account_id}
+
+
+@router.delete("/brokers/{broker_account_id}")
+def delete_broker(broker_account_id: str):
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM broker_accounts WHERE broker_account_id = %s", (broker_account_id,))
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"Broker mapping not found: {broker_account_id}")
+        conn.commit()
+    return {"ok": True, "deletedBrokerAccountId": broker_account_id}
